@@ -1,0 +1,19 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: s3-require-environment-tag
+  description: "All S3 buckets must have an environment tag"
+  tags: [governance, tagging, s3]
+
+spec:
+  scope:
+    resource_types: [aws.s3]
+    environments: ["*"]
+  rule:
+    metric: has_tag:Environment
+    operator: "=="
+    threshold: 0
+  severity: low
+  actions:
+    - type: recommend
+      suggestion: "Add 'Environment' tag (production, staging, development)"

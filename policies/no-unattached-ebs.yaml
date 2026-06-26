@@ -1,0 +1,20 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: no-unattached-ebs
+  description: "Flag EBS volumes not attached to any instance"
+  tags: [cost-optimization, storage]
+
+spec:
+  scope:
+    resource_types: [aws.ebs]
+    environments: ["*"]
+  rule:
+    metric: attached
+    operator: "=="
+    threshold: 0
+  severity: medium
+  actions:
+    - type: recommend
+      suggestion: "Delete unattached volume or attach to an instance"
+      estimated_savings: calc
