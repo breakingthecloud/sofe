@@ -1,0 +1,28 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: no-idle-ec2
+  description: "Flag EC2 instances with <5% CPU for 30 days"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, compute, idle]
+
+spec:
+  scope:
+    environments: ["*"]
+    resource_types: [aws.ec2]
+    regions: ["*"]
+    accounts: ["*"]
+
+  rule:
+    metric: avg_cpu_utilization
+    period: 30d
+    operator: "<"
+    threshold: 5
+
+  severity: high
+
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Rightsize or terminate this idle instance"
+      estimated_savings: calc
