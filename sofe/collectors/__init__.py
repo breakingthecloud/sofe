@@ -1,3 +1,4 @@
+from __future__ import annotations
 """AWS resource collectors for SOFE — scan resources + fetch metrics."""
 
 import boto3
@@ -25,6 +26,11 @@ def collect_all(profile: str = None, resource_types: list[str] = None, regions: 
 
     # Fetch metrics for collected resources
     _enrich_metrics(session, resources, target_regions[0])
+
+    # Add tag-based metrics
+    for r in resources:
+        for key in ['owner', 'env', 'costCenter', 'Environment', 'Name']:
+            r.metrics[f'has_tag:{key}'] = 1.0 if key in r.tags else 0.0
 
     return resources
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Evaluation engine — applies policies against resources."""
 
 import uuid
@@ -102,13 +103,12 @@ def _check_rule(resource: Resource, policy: Policy) -> Finding | None:
 
 
 def _apply_operator(value: float, operator: Operator, threshold: float) -> bool:
-    match operator:
-        case Operator.lt: return value < threshold
-        case Operator.gt: return value > threshold
-        case Operator.lte: return value <= threshold
-        case Operator.gte: return value >= threshold
-        case Operator.eq: return value == threshold
-        case Operator.ne: return value != threshold
+    if operator == Operator.lt: return value < threshold
+    elif operator == Operator.gt: return value > threshold
+    elif operator == Operator.lte: return value <= threshold
+    elif operator == Operator.gte: return value >= threshold
+    elif operator == Operator.eq: return value == threshold
+    elif operator == Operator.ne: return value != threshold
     return False
 
 

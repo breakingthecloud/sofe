@@ -1,0 +1,26 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: require-cost-tags
+  description: "All resources must have owner tag for cost allocation"
+  author: carlos@brickstore.ai
+  tags: [governance, tagging, finops]
+
+spec:
+  scope:
+    environments: ["*"]
+    resource_types: [aws.ec2, aws.s3, aws.lambda, aws.rds]
+    regions: ["*"]
+    accounts: ["*"]
+
+  rule:
+    metric: has_tag:owner
+    operator: "=="
+    threshold: 0
+
+  severity: medium
+
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Add 'owner' tag for cost allocation and accountability"
