@@ -252,6 +252,83 @@ sofe evaluate --policies ./policies/ --fail-on high
 
 ---
 
+## Ecosystem: Competitors & Complementary Tools
+
+### Competitors (overlap with SOFE)
+
+| Tool | Type | What it does | How SOFE differs |
+|------|------|-------------|-----------------|
+| **OPA / Rego** | OSS | General policy engine (security-focused) | SOFE is cost/FinOps-focused with savings calculations. OPA doesn't calculate $. |
+| **HashiCorp Sentinel** | Proprietary | Policy-as-code for Terraform | Locked to HCP/Terraform Cloud. SOFE is runtime (evaluates live infra, not just plans). |
+| **Infracost** | OSS | Cost estimation pre-deploy | Pre-deploy only. SOFE evaluates running infra + historical drift. Complementary. |
+| **AWS Config Rules** | AWS Native | Compliance rules on AWS resources | Limited to AWS, no cost focus, no CI/CD output, no portability. |
+| **Prowler** | OSS | Security & compliance scanning | Security-focused (CIS, PCI-DSS). Doesn't calculate cost savings or enforce FinOps. |
+| **Checkov** | OSS | IaC static analysis (Terraform, CF) | Pre-deploy only (scans .tf files). SOFE scans live resources. |
+| **Cloud Custodian** | OSS | Policy engine for cloud resources | Closest competitor. Actions (stop/terminate) built-in. SOFE is lighter, YAML-first, FinOps-focused. |
+| **Kubecost** | OSS/Paid | Kubernetes cost monitoring | K8s only. SOFE covers all AWS services. |
+| **Vantage** | SaaS | FinOps dashboard + alerts | Dashboard, not policy engine. No CI/CD. No custom rules. |
+| **CloudZero** | SaaS | Cost intelligence platform | Enterprise SaaS ($$$). No self-hosted. No policies-as-code. |
+| **Spot.io / NetApp** | SaaS | Cloud optimization + autoscaling | Optimization execution, not policy definition. Complementary. |
+| **Apptio Cloudability** | SaaS | Enterprise FinOps platform | Enterprise-only, expensive. No CI/CD integration. No code-first approach. |
+| **nOps** | SaaS | AWS cost optimization + scheduling | Automation focus. No declarative policies. |
+| **CAST AI** | SaaS | K8s cost optimization | K8s-only autoscaling. Not a policy engine. |
+
+### Complementary Tools (use alongside SOFE)
+
+| Tool | How it complements SOFE |
+|------|------------------------|
+| **Infracost** | Pre-deploy cost estimation → SOFE catches what slipped through post-deploy |
+| **Terraform / OpenTofu** | Defines infra → SOFE evaluates if running infra matches cost policies |
+| **AWS Cost Explorer** | Data source → SOFE collectors fetch from it |
+| **CloudWatch** | Metrics source → SOFE uses CPU, connections, invocations |
+| **Steampipe** | SQL-based cloud inventory → could be alternate data source for SOFE |
+| **Prometheus + Grafana** | Monitoring → SOFE could consume Prometheus metrics (future) |
+| **BYaML** | Architecture definitions → SOFE policies use same type system |
+| **byaml-finops-mcp** | MCP tools for AI assistants → SOFE findings feed into AI reasoning |
+| **FinOptix** | AI model for FinOps → explains SOFE findings in natural language |
+| **GitHub Actions / GitLab CI** | CI/CD → SOFE runs as pipeline step with `--fail-on` |
+| **Slack / PagerDuty** | Notifications → SOFE can webhook findings (future) |
+| **Neo4j** | Graph DB → SOFE findings + BYaML relationships = cost propagation graph (future) |
+
+### The SOFE Position
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Cloud Cost Lifecycle                           │
+├─────────────┬──────────────┬──────────────────┬─────────────────┤
+│  PLAN       │  DEPLOY      │  RUN             │  OPTIMIZE       │
+│             │              │                  │                 │
+│ Infracost   │ Sentinel     │ ★ SOFE ★         │ Spot.io         │
+│ Checkov     │ OPA/Rego     │ Cloud Custodian  │ CAST AI         │
+│             │ Checkov      │ AWS Config       │ nOps            │
+│             │              │ Prowler          │ Kubecost        │
+├─────────────┴──────────────┴──────────────────┴─────────────────┤
+│  VISIBILITY: Vantage, CloudZero, Apptio, AWS Cost Explorer       │
+└─────────────────────────────────────────────────────────────────┘
+
+SOFE lives in the RUN phase: evaluate LIVE infrastructure against
+declarative FinOps policies. Produce findings with dollar savings.
+```
+
+### Why SOFE vs Cloud Custodian?
+
+Cloud Custodian is the closest open source alternative. Key differences:
+
+| | SOFE | Cloud Custodian |
+|--|------|----------------|
+| **Focus** | FinOps + cost governance | Security + compliance + ops |
+| **Policy format** | Clean YAML (Pydantic-validated) | Complex YAML with filters/actions DSL |
+| **Savings calculation** | Built-in ($ per finding) | Not included |
+| **BYaML integration** | Native (same type system) | None |
+| **AI reasoning** | FinOptix integration (future) | None |
+| **CI/CD** | `--fail-on` exit code | Requires wrapper |
+| **Scope** | AWS first, multi-cloud future | AWS + Azure + GCP |
+| **Maturity** | New (2026) | Mature (2016+, Capital One) |
+
+SOFE is opinionated toward **FinOps** — every finding has a dollar amount. Cloud Custodian is a general-purpose policy engine that happens to work on cloud resources.
+
+---
+
 ## License
 
 Apache 2.0 — free to use, modify, and distribute.
