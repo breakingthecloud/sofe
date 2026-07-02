@@ -1,0 +1,21 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: cloudfront-no-compression
+  description: "CloudFront distributions should enable compression to reduce transfer costs"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, cdn, performance]
+spec:
+  scope:
+    resource_types: [aws.cloudfront]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: compression_enabled
+    operator: "=="
+    threshold: 0
+  severity: low
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Enable automatic compression (gzip/brotli) to reduce data transfer costs"

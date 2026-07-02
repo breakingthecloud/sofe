@@ -1,0 +1,23 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: no-oversized-staging
+  description: "Staging/dev instances should not be larger than t3.large"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, compute, governance]
+spec:
+  scope:
+    resource_types: [aws.ec2]
+    regions: ["*"]
+    accounts: ["*"]
+    environments: [staging, dev, development]
+  rule:
+    metric: monthly_cost
+    operator: ">"
+    threshold: 200
+  severity: high
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Downsize staging instance to t3.medium or smaller"
+      estimated_savings: calc

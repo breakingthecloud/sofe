@@ -1,0 +1,22 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: dynamodb-provisioned-waste
+  description: "Provisioned DynamoDB tables with low utilization should switch to on-demand"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, database, right-sizing]
+spec:
+  scope:
+    resource_types: [aws.dynamodb]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: provisioned_utilization_percent
+    operator: "<"
+    threshold: 20
+  severity: medium
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Switch to on-demand billing mode to pay only for actual usage"
+      estimated_savings: calc

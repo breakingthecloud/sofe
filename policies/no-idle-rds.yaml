@@ -1,0 +1,23 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: no-idle-rds
+  description: "Flag RDS instances with low connections for 14 days"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, database, idle]
+spec:
+  scope:
+    resource_types: [aws.rds]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: avg_connections
+    period: 14d
+    operator: "<"
+    threshold: 5
+  severity: high
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Consider stopping or downsizing this RDS instance"
+      estimated_savings: calc

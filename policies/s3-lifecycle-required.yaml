@@ -1,0 +1,21 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: s3-lifecycle-required
+  description: "All S3 buckets should have lifecycle rules configured"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, storage, governance]
+spec:
+  scope:
+    resource_types: [aws.s3]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: has_lifecycle_rules
+    operator: "=="
+    threshold: 0
+  severity: medium
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Add lifecycle rules to transition to IA/Glacier or expire old objects"

@@ -1,0 +1,21 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: s3-encryption-required
+  description: "All S3 buckets must have default encryption enabled"
+  author: carlos@brickstore.ai
+  tags: [security, storage, compliance]
+spec:
+  scope:
+    resource_types: [aws.s3]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: encryption_enabled
+    operator: "=="
+    threshold: 0
+  severity: high
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Enable SSE-S3 or SSE-KMS default encryption on this bucket"

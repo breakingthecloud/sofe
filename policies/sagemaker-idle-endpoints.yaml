@@ -1,0 +1,23 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: sagemaker-idle-endpoints
+  description: "SageMaker endpoints with no invocations are expensive to keep running"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, ai-ml, idle]
+spec:
+  scope:
+    resource_types: [aws.sagemaker]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: invocations_per_day
+    period: 7d
+    operator: "<"
+    threshold: 1
+  severity: high
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Delete idle SageMaker endpoint or use serverless inference"
+      estimated_savings: calc

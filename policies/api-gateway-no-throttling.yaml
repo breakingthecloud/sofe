@@ -1,0 +1,21 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: api-gateway-no-throttling
+  description: "API Gateway APIs without throttling are vulnerable to cost spikes"
+  author: carlos@brickstore.ai
+  tags: [cost-protection, security, api]
+spec:
+  scope:
+    resource_types: [aws.apigateway]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: throttle_configured
+    operator: "=="
+    threshold: 0
+  severity: medium
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Configure usage plan with throttle limits to prevent unexpected API costs"

@@ -1,0 +1,21 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: no-public-without-waf
+  description: "Public-facing ALBs and CloudFront should have WAF enabled"
+  author: carlos@brickstore.ai
+  tags: [security, cost-protection, networking]
+spec:
+  scope:
+    resource_types: [aws.elb, aws.cloudfront]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: waf_enabled
+    operator: "=="
+    threshold: 0
+  severity: high
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Enable AWS WAF to protect against DDoS and reduce unexpected traffic costs"

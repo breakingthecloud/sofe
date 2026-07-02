@@ -1,0 +1,23 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: elasticache-idle
+  description: "ElastiCache clusters with low connection count may be idle"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, cache, idle]
+spec:
+  scope:
+    resource_types: [aws.elasticache]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: avg_connections
+    period: 14d
+    operator: "<"
+    threshold: 10
+  severity: medium
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Consider downsizing or removing this idle cache cluster"
+      estimated_savings: calc

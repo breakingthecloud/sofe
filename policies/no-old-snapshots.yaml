@@ -1,0 +1,22 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: no-old-snapshots
+  description: "EBS snapshots older than 90 days should be reviewed"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, storage, cleanup]
+spec:
+  scope:
+    resource_types: [aws.ebs]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: snapshot_age_days
+    operator: ">"
+    threshold: 90
+  severity: low
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Delete old snapshots or archive to cheaper tier"
+      estimated_savings: calc

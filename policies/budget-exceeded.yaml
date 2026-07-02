@@ -1,0 +1,21 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: budget-exceeded
+  description: "Alert when monthly spend exceeds 80% of budget"
+  author: carlos@brickstore.ai
+  tags: [cost-governance, budget, critical]
+spec:
+  scope:
+    resource_types: ["*"]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: budget_utilization_percent
+    operator: ">"
+    threshold: 80
+  severity: critical
+  actions:
+    - type: finding
+    - type: notify
+      channel: stdout

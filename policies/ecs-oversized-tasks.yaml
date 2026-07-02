@@ -1,0 +1,23 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: ecs-oversized-tasks
+  description: "ECS tasks with low CPU/memory utilization may be over-provisioned"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, containers, right-sizing]
+spec:
+  scope:
+    resource_types: [aws.ecs]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: avg_cpu_utilization
+    period: 7d
+    operator: "<"
+    threshold: 10
+  severity: medium
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Reduce task CPU/memory allocation to match actual usage"
+      estimated_savings: calc

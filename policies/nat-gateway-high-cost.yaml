@@ -1,0 +1,22 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: nat-gateway-high-cost
+  description: "NAT Gateways processing >100GB/month are expensive — review alternatives"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, networking, high-cost]
+spec:
+  scope:
+    resource_types: [aws.natgateway]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: monthly_cost
+    operator: ">"
+    threshold: 100
+  severity: high
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Consider VPC endpoints, NAT instances, or PrivateLink to reduce NAT costs"
+      estimated_savings: calc

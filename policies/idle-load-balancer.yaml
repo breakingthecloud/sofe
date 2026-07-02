@@ -1,0 +1,22 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: idle-load-balancer
+  description: "Load balancers with no registered targets are wasting money"
+  author: carlos@brickstore.ai
+  tags: [cost-optimization, networking, idle]
+spec:
+  scope:
+    resource_types: [aws.elb]
+    regions: ["*"]
+    accounts: ["*"]
+  rule:
+    metric: has_targets
+    operator: "=="
+    threshold: 0
+  severity: medium
+  actions:
+    - type: finding
+    - type: recommend
+      suggestion: "Delete this idle load balancer — it has no registered targets"
+      estimated_savings: calc
