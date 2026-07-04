@@ -1,0 +1,21 @@
+# SOFE Community Server — Docker Compose
+# Usage: docker compose up
+# Then: curl http://localhost:8080/health
+
+services:
+  sofe:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      # Mount your AWS credentials (read-only)
+      - ~/.aws:/root/.aws:ro
+      # Mount custom policies (optional)
+      # - ./my-policies:/app/policies:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
