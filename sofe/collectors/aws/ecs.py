@@ -1,4 +1,4 @@
-"""AWS ECS collector — Fargate + EC2 services."""
+"""AWS ECS collector — services with running/desired count, launch type."""
 
 from .base import BaseCollector
 from ...models import Resource
@@ -13,20 +13,31 @@ class ECSCollector(BaseCollector):
             clusters = client.list_clusters().get('clusterArns', [])
             resources = []
             for cluster_arn in clusters:
-                cluster_name = cluster_arn.split('/')[-1]
                 services = client.list_services(cluster=cluster_arn).get('serviceArns', [])
-                if services:
-                    details = client.describe_services(cluster=cluster_arn, services=services[:10]).get('services', [])
-                    for svc in details:
-                        resources.append(self._make_resource(
-                            resource_id=f"{cluster_name}/{svc['serviceName']}",
-                            properties={
-                                'cluster': cluster_name,
-                                'launch_type': svc.get('launchType', 'UNKNOWN'),
-                                'desired_count': svc.get('desiredCount'),
-                                'running_count': svc.get('runningCount'),
-                            },
-                        ))
+                if not services:
+                    continue
+                described = client.describe_services(cluster=cluster_arn, services=services[:10]).get('services', [])
+                for svc in described:
+                    running = svc.get('runningCount', 0)
+                    desired = svc.get('desiredCount', 0)
+                    launch_type = svc.get('launchType', 'EC2')
+
+                    resources.append(self._make_resource(
+                        resource_id=svc['serviceName'],
+                        tags={t['key']: t['value'] for t in svc.get('tags', [])},
+                        properties={
+                            'cluster': cluster_arn.split('/')[-1],
+                            'launch_type': launch_type,
+                            'running_count': running,
+                            'desired_count': desired,
+                            'status': svc.get('status'),
+                        },
+                        metrics={
+                            'running_count': float(running),
+                            'desired_count': float(desired),
+                            'launch_type_fargate': 1.0 if launch_type == 'FARGATE' else 0.0,
+                        },
+                    ))
             return resources
         except Exception as e:
             print(f"  ⚠️  ECS scan failed in {self.region}: {e}")
