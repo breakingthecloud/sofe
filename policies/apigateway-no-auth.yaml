@@ -1,0 +1,16 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: apigateway-no-logging
+  description: "API Gateway stages without access logging"
+  severity: medium
+  tags: [governance, security]
+spec:
+  scope:
+    resource_types: ["aws.apigateway"]
+  rule:
+    metric: logging_enabled
+    operator: "=="
+    threshold: 0
+  message: "logging_enabled = {value} (threshold: =={threshold})"
+  recommendation: "Enable access logging for audit trail and troubleshooting"

@@ -1,0 +1,16 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: s3-versioning-required
+  description: "S3 buckets should have versioning enabled for data protection"
+  severity: medium
+  tags: [governance, storage]
+spec:
+  scope:
+    resource_types: ["aws.s3"]
+  rule:
+    metric: versioning_enabled
+    operator: "=="
+    threshold: 0
+  message: "versioning_enabled = {value} (threshold: =={threshold})"
+  recommendation: "Enable versioning to protect against accidental deletions"

@@ -1,0 +1,16 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: cloudfront-no-waf
+  description: "CloudFront distributions without WAF protection"
+  severity: high
+  tags: [security, edge]
+spec:
+  scope:
+    resource_types: ["aws.cloudfront"]
+  rule:
+    metric: waf_enabled
+    operator: "=="
+    threshold: 0
+  message: "waf_enabled = {value} (threshold: =={threshold})"
+  recommendation: "Enable AWS WAF to protect against DDoS, SQL injection, and XSS attacks"
