@@ -1,26 +1,48 @@
-"""AWS SageMaker collector — endpoints and notebook instances."""
+"""AWS SageMaker collector — endpoints with instance count, variant metrics."""
+
 from .base import BaseCollector
 from ...models import Resource
 
+
 class SageMakerCollector(BaseCollector):
     resource_type = "aws.sagemaker"
+
     def collect(self) -> list[Resource]:
         try:
             client = self.session.client('sagemaker', region_name=self.region)
+            endpoints = client.list_endpoints(StatusEquals='InService').get('Endpoints', [])
             resources = []
-            # Endpoints
-            endpoints = client.list_endpoints().get('Endpoints', [])
             for ep in endpoints:
+                name = ep['EndpointName']
+                # Get endpoint config for instance details
+                total_instances = 0
+                try:
+                    detail = client.describe_endpoint(EndpointName=name)
+                    variants = detail.get('ProductionVariants', [])
+                    total_instances = sum(v.get('CurrentInstanceCount', 0) for v in variants)
+                except:
+                    pass
+
+                # Tags
+                tags = {}
+                try:
+                    tag_resp = client.list_tags(ResourceArn=ep['EndpointArn'])
+                    tags = {t['Key']: t['Value'] for t in tag_resp.get('Tags', [])}
+                except:
+                    pass
+
                 resources.append(self._make_resource(
-                    resource_id=f"endpoint/{ep['EndpointName']}",
-                    properties={'status': ep.get('EndpointStatus'), 'type': 'endpoint'},
-                ))
-            # Notebook instances
-            notebooks = client.list_notebook_instances().get('NotebookInstances', [])
-            for nb in notebooks:
-                resources.append(self._make_resource(
-                    resource_id=f"notebook/{nb['NotebookInstanceName']}",
-                    properties={'status': nb.get('NotebookInstanceStatus'), 'instance_type': nb.get('InstanceType'), 'type': 'notebook'},
+                    resource_id=name,
+                    tags=tags,
+                    properties={
+                        'status': ep.get('EndpointStatus'),
+                        'creation_time': str(ep.get('CreationTime', '')),
+                        'instance_count': total_instances,
+                    },
+                    metrics={
+                        'instance_count': float(total_instances),
+                        'endpoint_active': 1.0,
+                    },
                 ))
             return resources
         except Exception as e:
