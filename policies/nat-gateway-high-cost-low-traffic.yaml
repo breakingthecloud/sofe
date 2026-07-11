@@ -1,0 +1,19 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: nat-gateway-high-cost-low-traffic
+  description: "NAT Gateway costs fixed $32+/month even with minimal traffic — consider alternatives"
+  author: sofe
+  tags: [cost, architecture, optimization]
+spec:
+  scope:
+    resource_types: ["aws.natgateway"]
+  rule:
+    metric: bytes_processed_monthly
+    operator: "<"
+    threshold: 1000000000
+  severity: medium
+  actions:
+    - type: finding
+      suggestion: "Low-traffic NAT Gateway — consider VPC endpoints for S3/DynamoDB or NAT instance for savings"
+      estimated_savings: "calc"

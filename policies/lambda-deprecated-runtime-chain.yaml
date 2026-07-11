@@ -1,0 +1,18 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: lambda-deprecated-runtime-in-chain
+  description: "Lambda with deprecated runtime may break dependent services"
+  author: sofe
+  tags: [reliability, architecture, deprecation]
+spec:
+  scope:
+    resource_types: ["aws.lambda"]
+  rule:
+    metric: runtime_deprecated
+    operator: "=="
+    threshold: 1
+  severity: high
+  actions:
+    - type: finding
+      suggestion: "Update Lambda runtime before AWS disables it — this may break downstream services"

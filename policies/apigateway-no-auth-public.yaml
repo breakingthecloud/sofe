@@ -1,0 +1,18 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: apigateway-no-auth-public
+  description: "API Gateway endpoint has no authentication configured"
+  author: sofe
+  tags: [security, architecture]
+spec:
+  scope:
+    resource_types: ["aws.apigateway"]
+  rule:
+    metric: auth_type
+    operator: "=="
+    threshold: 0
+  severity: high
+  actions:
+    - type: finding
+      suggestion: "Configure IAM, Cognito, or API key authentication on this API Gateway"

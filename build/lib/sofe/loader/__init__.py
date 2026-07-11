@@ -3,6 +3,7 @@
 import os
 import yaml
 from pathlib import Path
+from typing import Optional
 from ..models import Policy
 
 
@@ -12,30 +13,34 @@ def load_policies(path: str) -> list[Policy]:
     p = Path(path)
 
     if p.is_file():
-        policies.append(_load_single(p))
+        pol = _load_single(p)
+        if pol:
+            policies.append(pol)
     elif p.is_dir():
         for f in sorted(p.glob("*.yaml")):
-            policies.append(_load_single(f))
+            pol = _load_single(f)
+            if pol:
+                policies.append(pol)
         for f in sorted(p.glob("*.yml")):
-            policies.append(_load_single(f))
+            pol = _load_single(f)
+            if pol:
+                policies.append(pol)
     else:
         raise FileNotFoundError(f"Policy path not found: {path}")
 
     return policies
 
 
-def _load_single(path: Path) -> Policy:
-    """Load and validate a single policy file."""
-    with open(path) as f:
-        data = yaml.safe_load(f)
-
-    if not data:
-        raise ValueError(f"Empty policy file: {path}")
-
+def _load_single(path: Path) -> Optional[Policy]:
+    """Load and validate a single policy file. Returns None if invalid."""
     try:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        if not data:
+            return None
         return Policy(**data)
-    except Exception as e:
-        raise ValueError(f"Invalid policy {path.name}: {e}")
+    except Exception:
+        return None  # Skip invalid policies silently
 
 
 def validate_policies(path: str) -> list[dict]:

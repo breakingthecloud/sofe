@@ -1,16 +1,19 @@
 apiVersion: sofe/v1
 kind: Policy
 metadata:
-  name: rds-no-multi-az
-  description: "RDS instances without Multi-AZ (single point of failure)"
-  severity: high
-  tags: [reliability, database]
+  name: rds-no-multi-az-prod
+  description: "Production RDS instance is not Multi-AZ — single point of failure risk"
+  author: sofe
+  tags: [reliability, architecture]
 spec:
   scope:
     resource_types: ["aws.rds"]
+    environments: ["prod", "production"]
   rule:
     metric: multi_az
     operator: "=="
     threshold: 0
-  message: "multi_az = {value} (threshold: =={threshold})"
-  recommendation: "Enable Multi-AZ for production databases (automatic failover)"
+  severity: high
+  actions:
+    - type: finding
+      suggestion: "Enable Multi-AZ for production database to ensure high availability"

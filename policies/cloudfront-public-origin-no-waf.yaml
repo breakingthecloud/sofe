@@ -1,0 +1,18 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: cloudfront-public-origin-no-waf
+  description: "CloudFront distribution with public-facing origin lacks WAF protection"
+  author: sofe
+  tags: [security, architecture, cross-resource]
+spec:
+  scope:
+    resource_types: ["aws.cloudfront"]
+  rule:
+    metric: waf_enabled
+    operator: "=="
+    threshold: 0
+  severity: high
+  actions:
+    - type: finding
+      suggestion: "Enable AWS WAF on this CloudFront distribution to protect the public origin"
