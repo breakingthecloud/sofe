@@ -1,0 +1,18 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: high-cost-service
+  description: "A service (resource type) accumulates over $100/month across all its resources"
+  author: sofe
+  tags: [cost, finops, budget]
+spec:
+  scope:
+    resource_types: ["aws.ec2", "aws.rds", "aws.elasticache", "aws.redshift", "aws.sagemaker", "aws.eks"]
+  rule:
+    metric: monthly_cost
+    operator: ">"
+    threshold: 100
+  severity: medium
+  actions:
+    - type: finding
+      suggestion: "This resource costs over $100/month. Evaluate Reserved Instances or Savings Plans for predictable workloads."

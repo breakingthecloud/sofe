@@ -1,0 +1,23 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: idle-expensive-resource
+  description: "Resource is idle (CPU <5%) AND costs more than $10/month — immediate savings opportunity"
+  author: sofe
+  tags: [cost, finops, idle, optimization]
+spec:
+  scope:
+    resource_types: ["aws.ec2"]
+  rule:
+    metric: avg_cpu_utilization
+    operator: "<"
+    threshold: 5
+    additional_conditions:
+      - field: monthly_cost
+        operator: ">"
+        value: 10
+  severity: high
+  actions:
+    - type: finding
+      suggestion: "This instance is idle AND costs real money. Terminate or stop to save immediately."
+      estimated_savings: "calc"

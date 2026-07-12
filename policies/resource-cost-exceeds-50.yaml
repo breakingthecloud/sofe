@@ -1,0 +1,19 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: resource-cost-exceeds-50
+  description: "Single resource costs more than $50/month — review for rightsizing or termination"
+  author: sofe
+  tags: [cost, finops, optimization]
+spec:
+  scope:
+    resource_types: ["aws.ec2", "aws.rds", "aws.elasticache", "aws.redshift", "aws.eks", "aws.natgateway"]
+  rule:
+    metric: monthly_cost
+    operator: ">"
+    threshold: 50
+  severity: medium
+  actions:
+    - type: finding
+      suggestion: "This resource costs over $50/month. Consider rightsizing, stopping during off-hours, or terminating if unused."
+      estimated_savings: "calc"
