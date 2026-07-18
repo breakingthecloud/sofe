@@ -2,15 +2,19 @@ apiVersion: sofe/v1
 kind: Policy
 metadata:
   name: dynamodb-provisioned-mode
-  description: "DynamoDB tables using provisioned mode (may be overpaying vs on-demand)"
-  severity: low
-  tags: [cost-optimization, database]
+  description: DynamoDB tables using provisioned mode (may be overpaying vs on-demand)
+  tags:
+  - cost-optimization
+  - database
 spec:
   scope:
-    resource_types: ["aws.dynamodb"]
+    resource_types:
+    - aws.dynamodb
   rule:
     metric: billing_mode_provisioned
-    operator: "=="
+    operator: ==
     threshold: 1
-  message: "billing_mode_provisioned = {value} (threshold: =={threshold})"
-  recommendation: "Consider switching to on-demand (PAY_PER_REQUEST) if traffic is unpredictable"
+  message: 'billing_mode_provisioned = {value} (threshold: =={threshold})'
+  recommendation: Consider switching to on-demand (PAY_PER_REQUEST) if traffic is
+    unpredictable
+  severity: low

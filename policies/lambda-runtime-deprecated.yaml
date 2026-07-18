@@ -2,15 +2,18 @@ apiVersion: sofe/v1
 kind: Policy
 metadata:
   name: lambda-runtime-deprecated
-  description: "Lambda functions using deprecated runtimes (security risk)"
-  severity: high
-  tags: [security, compute]
+  description: Lambda functions using deprecated runtimes (security risk)
+  tags:
+  - security
+  - compute
 spec:
   scope:
-    resource_types: ["aws.lambda"]
+    resource_types:
+    - aws.lambda
   rule:
     metric: runtime_deprecated
-    operator: "=="
+    operator: ==
     threshold: 1
-  message: "runtime_deprecated = {value} (threshold: =={threshold})"
-  recommendation: "Upgrade to a supported runtime (Python 3.12+, Node 20+, Java 21+)"
+  message: 'runtime_deprecated = {value} (threshold: =={threshold})'
+  recommendation: Upgrade to a supported runtime (Python 3.12+, Node 20+, Java 21+)
+  severity: high

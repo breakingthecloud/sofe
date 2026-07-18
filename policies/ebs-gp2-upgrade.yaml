@@ -2,15 +2,19 @@ apiVersion: sofe/v1
 kind: Policy
 metadata:
   name: ebs-gp2-upgrade-to-gp3
-  description: "EBS volumes still on gp2 (gp3 is 20% cheaper with better performance)"
-  severity: low
-  tags: [cost-optimization, storage]
+  description: EBS volumes still on gp2 (gp3 is 20% cheaper with better performance)
+  tags:
+  - cost-optimization
+  - storage
 spec:
   scope:
-    resource_types: ["aws.ebs"]
+    resource_types:
+    - aws.ebs
   rule:
     metric: volume_type_gp2
-    operator: "=="
+    operator: ==
     threshold: 1
-  message: "volume_type_gp2 = {value} (threshold: =={threshold})"
-  recommendation: "Migrate from gp2 to gp3 for 20% cost savings and better baseline IOPS"
+  message: 'volume_type_gp2 = {value} (threshold: =={threshold})'
+  recommendation: Migrate from gp2 to gp3 for 20% cost savings and better baseline
+    IOPS
+  severity: low

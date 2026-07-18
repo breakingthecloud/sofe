@@ -2,15 +2,18 @@ apiVersion: sofe/v1
 kind: Policy
 metadata:
   name: s3-public-access-not-blocked
-  description: "S3 buckets without public access block (data exposure risk)"
-  severity: critical
-  tags: [security, storage]
+  description: S3 buckets without public access block (data exposure risk)
+  tags:
+  - security
+  - storage
 spec:
   scope:
-    resource_types: ["aws.s3"]
+    resource_types:
+    - aws.s3
   rule:
     metric: public_access_blocked
-    operator: "=="
+    operator: ==
     threshold: 0
-  message: "public_access_blocked = {value} (threshold: =={threshold})"
-  recommendation: "Enable S3 Block Public Access immediately to prevent data leaks"
+  message: 'public_access_blocked = {value} (threshold: =={threshold})'
+  recommendation: Enable S3 Block Public Access immediately to prevent data leaks
+  severity: critical

@@ -2,15 +2,19 @@ apiVersion: sofe/v1
 kind: Policy
 metadata:
   name: spot-instance-usage
-  description: "Detect on-demand instances that could use spot pricing"
-  severity: medium
-  tags: [cost-optimization, compute]
+  description: Detect on-demand instances that could use spot pricing
+  tags:
+  - cost-optimization
+  - compute
 spec:
   scope:
-    resource_types: ["aws.ec2"]
+    resource_types:
+    - aws.ec2
   rule:
     metric: purchase_option_spot
-    operator: "=="
+    operator: ==
     threshold: 0
-  message: "purchase_option_spot = {value} (threshold: =={threshold})"
-  recommendation: "Consider using spot instances for non-critical workloads (up to 90% savings)"
+  message: 'purchase_option_spot = {value} (threshold: =={threshold})'
+  recommendation: Consider using spot instances for non-critical workloads (up to
+    90% savings)
+  severity: medium
