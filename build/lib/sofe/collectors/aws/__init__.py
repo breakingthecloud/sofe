@@ -1,4 +1,4 @@
-"""AWS Collectors registry — all 16 collectors."""
+"""AWS Collectors registry — all 18 collectors."""
 
 from .ec2 import EC2Collector
 from .s3 import S3Collector
@@ -17,6 +17,7 @@ from .elb import ELBCollector
 from .route53 import Route53Collector
 from .secretsmanager import SecretsManagerCollector
 from .sagemaker import SageMakerCollector
+from .cost import CostCollector
 
 # Registry: resource_type → Collector class
 COLLECTORS = {
@@ -37,6 +38,7 @@ COLLECTORS = {
     "aws.route53": Route53Collector,
     "aws.secretsmanager": SecretsManagerCollector,
     "aws.sagemaker": SageMakerCollector,
+    "aws.cost": CostCollector,
 }
 
 ALL_TYPES = list(COLLECTORS.keys())
