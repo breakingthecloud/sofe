@@ -1,5 +1,10 @@
 # 🏗️ SOFE — Stairway Open FinOps Engine
 
+[![PyPI version](https://img.shields.io/pypi/v/sofe?color=blue)](https://pypi.org/project/sofe/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://python.org)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![sofe.dev](https://img.shields.io/badge/web-sofe.dev-8A2BE2)](https://sofe.dev)
+
 **FinOps Policies as Code for AWS.**
 
 SOFE evaluates declarative YAML policies against live AWS infrastructure and produces actionable findings — idle resources, missing tags, governance violations, and cost savings opportunities.
