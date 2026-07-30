@@ -1,4 +1,4 @@
-# 🏗️ SOFE — Stairway Open FinOps Engine
+# SOFE — Stairway Open FinOps Engine
 
 [![PyPI version](https://img.shields.io/pypi/v/sofe?color=blue)](https://pypi.org/project/sofe/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://python.org)
