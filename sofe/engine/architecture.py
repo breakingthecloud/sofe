@@ -1,7 +1,18 @@
-"""Architecture context — cross-resource relationship graph for policy evaluation."""
+"""Architecture context — cross-resource relationship graph for policy evaluation.
+
+ByaML-006 Fase A / S053 §7: el motor de análisis (blast_radius / cost_chain / team_cost /
+single_points_of_failure) delega en **nan-graph** (motor OSS publicado, PyPI). Este módulo mantiene
+la API de `ArchitectureContext` (resources/relationships/get_related) que consumidores SOFE ya usan;
+los algoritmos de traversal los resuelve nan-graph (traverse/blast/cost/SPOF). Elimina el código
+duplicado de algoritmos.
+"""
 
 from __future__ import annotations
 from dataclasses import dataclass, field
+
+from nangraph import NanGraph
+from nangraph.types import GraphNode
+
 from ..models import Resource
 
 
@@ -15,14 +26,21 @@ class Relationship:
 
 @dataclass
 class ArchitectureContext:
-    """Graph of resources and relationships for architecture-aware evaluation."""
+    """Graph of resources and relationships for architecture-aware evaluation.
+
+    Almacena resources + relationships (fuente de verdad de SOFE) y construye un `NanGraph`
+    interno (lazy) para resolver las métricas de arquitectura (blast radius, cost chain, SPOF).
+    """
+
     resources: dict[str, Resource] = field(default_factory=dict)
     relationships: list[Relationship] = field(default_factory=list)
     _adjacency: dict[str, list[tuple[str, str]]] = field(default_factory=dict)  # id -> [(target_id, rel_type)]
     _reverse: dict[str, list[tuple[str, str]]] = field(default_factory=dict)  # id -> [(source_id, rel_type)]
+    _nan: NanGraph = field(default=None, repr=False)
 
     def add_resource(self, resource: Resource):
         self.resources[resource.resource_id] = resource
+        self._nan = None  # invalidar cache
 
     def add_relationship(self, from_id: str, to_id: str, rel_type: str):
         self.relationships.append(Relationship(from_id, to_id, rel_type))
@@ -32,7 +50,31 @@ class ArchitectureContext:
         if to_id not in self._reverse:
             self._reverse[to_id] = []
         self._reverse[to_id].append((from_id, rel_type))
+        self._nan = None  # invalidar cache
 
+    # ── NanGraph interno (lazy) ──────────────────────────────────────────────
+    def _nan_graph(self) -> NanGraph:
+        """Construye (cacheado) el NanGraph desde resources + relationships."""
+        if self._nan is not None:
+            return self._nan
+        g = NanGraph()
+        for r in self.resources.values():
+            node = GraphNode(
+                id=r.resource_id,
+                type=r.resource_type,
+                label=getattr(r, "name", None),
+                attrs={
+                    "monthly_cost": r.metrics.get("monthly_cost", 0) or 0,
+                    "owner": r.tags.get("owner") or r.tags.get("Owner"),
+                },
+            )
+            g.add_node(node)
+        for rel in self.relationships:
+            g.add_edge(from_id=rel.from_id, to_id=rel.to_id, rel_type=rel.rel_type)
+        self._nan = g
+        return g
+
+    # ── API pública (sin cambios para consumidores) ─────────────────────────
     def get_related(self, resource_id: str, rel_type: str = None, direction: str = "outgoing") -> list[Resource]:
         """Get resources related to the given resource.
         
@@ -51,32 +93,18 @@ class ArchitectureContext:
                         result.append(self.resources[source_id])
         return result
 
+    # ── Métricas delegadas a nan-graph ───────────────────────────────────────
     def blast_radius(self, resource_id: str) -> list[str]:
         """Calculate blast radius — all resources affected if this one fails (BFS)."""
-        visited = set()
-        queue = [resource_id]
-        while queue:
-            current = queue.pop(0)
-            if current in visited:
-                continue
-            visited.add(current)
-            for target_id, _ in self._adjacency.get(current, []):
-                if target_id not in visited:
-                    queue.append(target_id)
-        visited.discard(resource_id)  # Don't include self
-        return list(visited)
+        from nangraph import blast_radius as nan_blast
+
+        return nan_blast(self._nan_graph(), resource_id)
 
     def cost_chain(self, resource_id: str) -> float:
         """Sum monthly_cost of all downstream resources (BFS forward)."""
-        affected = self.blast_radius(resource_id)
-        total = 0.0
-        for rid in affected:
-            if rid in self.resources:
-                total += self.resources[rid].metrics.get("monthly_cost", 0)
-        # Include self
-        if resource_id in self.resources:
-            total += self.resources[resource_id].metrics.get("monthly_cost", 0)
-        return round(total, 2)
+        from nangraph import cost_chain as nan_cost_chain
+
+        return nan_cost_chain(self._nan_graph(), resource_id)
 
     def team_cost(self, owner: str) -> float:
         """Sum monthly_cost for all resources owned by a team/person."""
@@ -89,11 +117,15 @@ class ArchitectureContext:
 
     def fan_in(self, resource_id: str) -> int:
         """Count how many resources depend on this one (incoming edges)."""
-        return len(self._reverse.get(resource_id, []))
+        from nangraph import fan_in as nan_fan_in
+
+        return nan_fan_in(self._nan_graph(), resource_id)
 
     def single_points_of_failure(self, threshold: int = 3) -> list[str]:
         """Resources with high fan-in (many things depend on them)."""
-        return [rid for rid in self.resources if self.fan_in(rid) >= threshold]
+        from nangraph import single_points_of_failure as nan_spof
+
+        return nan_spof(self._nan_graph(), threshold)
 
     @classmethod
     def from_resources(cls, resources: list[Resource]) -> "ArchitectureContext":

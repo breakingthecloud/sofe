@@ -22,6 +22,7 @@ dependencies = [
     "pyyaml>=6.0",
     "click>=8.0",
     "rich>=13.0",
+    "nan-graph>=0.1.0",
 ]
 
 [project.urls]
@@ -38,3 +39,8 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["sofe*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
