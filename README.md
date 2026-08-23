@@ -216,7 +216,9 @@ Checkov        Sentinel     Cloud Custodian   CAST AI
 
 ## BYaML Integration
 
-SOFE uses [BYaML](https://byaml.org) component types (`aws.ec2`, `aws.s3`, etc.) — the same type system used for architecture governance. Policies reference the same types as your architecture definitions, and findings map directly to BYaML components.
+SOFE derives an [Architecture Graph v0.4](https://github.com/breakingthecloud/byaml-spec) (BYaML v2)
+— nodos con tipos canónicos (`aws.ec2`, `aws.s3`, …) y aristas tipadas. Es el mismo estándar del registry
+`schema.byaml.org` y de `byaml-mcp` (agentes). `/evaluations/:id/graph` expone el grafo derivado.
 
 ## Ecosystem
 
@@ -225,7 +227,8 @@ SOFE uses [BYaML](https://byaml.org) component types (`aws.ec2`, `aws.s3`, etc.)
 | [sofe-server](https://github.com/breakingthecloud/sofe-server) | REST API server (FastAPI) |
 | [sofe-cli](https://github.com/breakingthecloud/sofe-cli) | Go CLI (19 commands, TUI) |
 | [sofe-action](https://github.com/breakingthecloud/sofe-action) | GitHub Action |
-| [byaml-finops-mcp](https://github.com/breakingthecloud/byaml-finops-mcp) | MCP tools for AI FinOps |
+| [byaml-spec](https://github.com/breakingthecloud/byaml-spec) | Estándar Architecture Graph v0.4 (schema/catalog/relationships) |
+| [byaml-mcp](https://github.com/breakingthecloud/byaml-mcp) | MCP tools para agentes (graph + insights + remediation) |
 | [FinOptix](https://github.com/breakingthecloud/finoptix) | AI model for FinOps reasoning |
 
 ## License
