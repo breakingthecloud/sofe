@@ -1,6 +1,34 @@
-# 🏗️ SOFE — Stairway Open FinOps Engine
+<p align="center">
+  <img alt="SOFE" src="https://img.shields.io/badge/🏗️-SOFE-8A2BE2?style=for-the-badge" height="50">
+</p>
 
-**FinOps Policies as Code for AWS.**
+<p align="center">
+  <b>FinOps Policies as Code for AWS</b><br>
+  Declarative YAML policies → live infrastructure evaluation → findings with dollar savings.
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a>
+  ·
+  <a href="#why-sofe">Why SOFE?</a>
+  ·
+  <a href="#comparison">Comparison</a>
+  ·
+  <a href="#pre-built-policies">Policies</a>
+  ·
+  <a href="#cicd">CI/CD</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/pypi/v/sofe?style=flat-square&logo=pypi&color=8A2BE2" alt="PyPI">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square&logo=python" alt="Python">
+  <img src="https://img.shields.io/badge/license-Apache_2.0-8A2BE2?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/policies-10-success?style=flat-square" alt="10 policies">
+  <img src="https://img.shields.io/badge/collectors-18-blue?style=flat-square" alt="18 collectors">
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs">
+</p>
+
+---
 
 SOFE evaluates declarative YAML policies against live AWS infrastructure and produces actionable findings — idle resources, missing tags, governance violations, and cost savings opportunities.
 
@@ -19,24 +47,15 @@ Severity   Policy                    Resource             Message
 Summary: 3 findings | Potential savings: $365.00/mo
 ```
 
----
-
 ## Why SOFE?
 
 ### The Problem
 
-Teams today manage cloud costs **reactively** — they see the bill spike, panic, then scramble to find what changed. Existing tools either:
+Teams today manage cloud costs **reactively** — they see the bill spike, panic, then scramble to find what changed. Existing tools either alert on total spend (no root cause), scan for security (not cost-focused), or lock you into a vendor.
 
-- **Alert on total spend** (AWS Budgets) — no root cause, no policy enforcement
-- **Scan for security** (Prowler, ScoutSuite) — not cost-focused
-- **Estimate costs** (Infracost) — pre-deploy only, no runtime enforcement
-- **Lock you in** (Sentinel/HCP) — vendor-specific, not portable
-
-**No tool does:** declarative cost+governance policies that evaluate against **live** infrastructure and produce findings with dollar-amount savings.
+**No tool does:** declarative cost + governance policies that evaluate against **live** infrastructure and produce findings with dollar-amount savings.
 
 ### The Solution
-
-SOFE fills this gap:
 
 ```yaml
 # policies/no-idle-production.yaml
@@ -63,8 +82,6 @@ spec:
 
 Write a policy once. Run it daily. Get findings with savings.
 
----
-
 ## Who Should Use SOFE?
 
 | Role | Why SOFE matters |
@@ -72,61 +89,17 @@ Write a policy once. Run it daily. Get findings with savings.
 | **Cloud/DevOps Engineers** | Automate governance checks in CI/CD. `sofe evaluate --fail-on high` blocks deploys that violate cost policies. |
 | **FinOps Practitioners** | Define cost optimization rules as code. Track compliance across accounts. Quantify waste. |
 | **Platform Engineers** | Enforce tagging standards, idle resource cleanup, and architecture best practices at scale. |
-| **CTOs / Engineering Managers** | Visibility into cloud waste without manual audits. "We save $X/month because of these policies." |
+| **CTOs / Engineering Managers** | Visibility into cloud waste without manual audits. |
 | **AWS Partners / Consultants** | Deliver FinOps assessments faster with repeatable, auditable policy evaluations. |
-
----
-
-## Why SOFE is Key for FinOps + Governance
-
-### 1. FinOps: Cost Optimization as Code
-
-Traditional FinOps is manual: someone opens Cost Explorer, finds waste, creates a ticket. SOFE automates this:
-
-```
-Write policy → sofe evaluate → findings with $ savings → action
-```
-
-Every policy produces **quantified savings**: "$340/mo if you terminate this idle instance."
-
-### 2. Cloud Governance: Policies that Actually Enforce
-
-Tags, encryption, public access, budget limits — every team has rules but no enforcement. SOFE makes them executable:
-
-```yaml
-- require-cost-tags       → "All resources must have owner + costCenter"
-- s3-encryption-required  → "All S3 buckets must have encryption enabled"
-- no-public-without-waf   → "No public-facing resource without WAF"
-```
-
-Not just documentation. Actual enforcement in CI/CD.
-
-### 3. DevOps: Shift-Left Cost Awareness
-
-Add `sofe evaluate --fail-on high` to your GitHub Action or CI pipeline. Developers see cost violations **before** merge, not after the bill arrives.
-
-### 4. BYaML Integration: Architecture-Aware FinOps
-
-SOFE uses [BYaML](https://byaml.org) component types (`aws.ec2`, `aws.s3`, etc.) — the same type system used for architecture governance. This means:
-
-- Policies reference the same types as your architecture definitions
-- Findings map directly to BYaML components
-- Cost data correlates with architecture versions
-
----
 
 ## Quick Start
 
-### Install
-
 ```bash
+# Install
 pip install sofe
-```
 
-### Write Your First Policy
-
-```yaml
-# policies/require-tags.yaml
+# Write your first policy
+cat > policies/require-tags.yaml << 'EOF'
 apiVersion: sofe/v1
 kind: Policy
 metadata:
@@ -142,28 +115,20 @@ spec:
   severity: medium
   actions:
     - type: finding
-```
+EOF
 
-### Validate
-
-```bash
+# Validate
 sofe validate --policies ./policies/
-```
 
-### Evaluate
-
-```bash
-# Against real AWS (uses your AWS profile)
+# Evaluate against live AWS
 sofe evaluate --policies ./policies/ --profile production
-
-# Output as JSON (for automation)
-sofe evaluate --policies ./policies/ --format json > findings.json
 
 # CI/CD mode (exit code 1 if high/critical found)
 sofe evaluate --policies ./policies/ --fail-on high
-```
 
----
+# JSON output for automation
+sofe evaluate --policies ./policies/ --format json > findings.json
+```
 
 ## How It Works
 
@@ -176,31 +141,15 @@ sofe evaluate --policies ./policies/ --fail-on high
 │ schema          │     │ S3, Lambda   │     │ evaluate condition → │
 │                 │     │ CloudWatch   │     │ if violated →        │
 └─────────────────┘     └──────────────┘     │   generate finding   │
-                                             └──────────┬───────────┘
-                                                        │
-                                              ┌─────────▼─────────┐
-                                              │  Output            │
-                                              │  • Table (CLI)     │
-                                              │  • JSON (CI/CD)    │
-                                              │  • Markdown (PRs)  │
-                                              └────────────────────┘
+                                              └──────────┬───────────┘
+                                                         │
+                                               ┌─────────▼─────────┐
+                                               │  Output            │
+                                               │  • Table (CLI)     │
+                                               │  • JSON (CI/CD)    │
+                                               │  • Markdown (PRs)  │
+                                               └────────────────────┘
 ```
-
----
-
-## Supported Metrics
-
-| Metric | Source | Resources |
-|--------|--------|-----------|
-| `avg_cpu_utilization` | CloudWatch (30d avg) | EC2, RDS |
-| `monthly_cost` | Cost Explorer | All |
-| `running_days` | LaunchTime | EC2, RDS |
-| `has_tag:{key}` | Tags API | All |
-| `storage_used_gb` | CloudWatch | S3, EBS |
-| `connections` | CloudWatch | RDS |
-| `invocations` | CloudWatch | Lambda |
-
----
 
 ## Pre-Built Policies
 
@@ -217,11 +166,19 @@ sofe evaluate --policies ./policies/ --fail-on high
 | `budget-exceeded` | Budget | critical |
 | `no-public-without-waf` | Security/Cost | high |
 
----
+## Supported Metrics
 
-## CI/CD Integration
+| Metric | Source | Resources |
+|--------|--------|-----------|
+| `avg_cpu_utilization` | CloudWatch (30d avg) | EC2, RDS |
+| `monthly_cost` | Cost Explorer | All |
+| `running_days` | LaunchTime | EC2, RDS |
+| `has_tag:{key}` | Tags API | All |
+| `storage_used_gb` | CloudWatch | S3, EBS |
+| `connections` | CloudWatch | RDS |
+| `invocations` | CloudWatch | Lambda |
 
-### GitHub Actions
+## CI/CD
 
 ```yaml
 - name: FinOps Policy Check
@@ -230,14 +187,10 @@ sofe evaluate --policies ./policies/ --fail-on high
     sofe evaluate --policies ./policies/ --fail-on high --format json > findings.json
 ```
 
-### Exit Codes
-
-| Code | Meaning |
-|:----:|---------|
+| Exit Code | Meaning |
+|:---------:|---------|
 | 0 | No violations (or below `--fail-on` threshold) |
 | 1 | Violations found at or above `--fail-on` severity |
-
----
 
 ## Comparison
 
@@ -247,87 +200,33 @@ sofe evaluate --policies ./policies/ --fail-on high
 | AWS Budgets | ❌ (alerts only) | ❌ | ❌ | ❌ | ❌ |
 | Infracost | 🟡 (pre-deploy) | ❌ | ✅ | ✅ | ✅ |
 | OPA/Rego | ✅ (security) | ❌ | ❌ | ✅ | ✅ |
-| Sentinel | ✅ | ❌ | ❌ | ✅ | ❌ (HCP only) |
 | Prowler | ❌ (security only) | ✅ | ❌ | ✅ | ✅ |
-
----
-
-## Ecosystem: Competitors & Complementary Tools
-
-### Competitors (overlap with SOFE)
-
-| Tool | Type | What it does | How SOFE differs |
-|------|------|-------------|-----------------|
-| **OPA / Rego** | OSS | General policy engine (security-focused) | SOFE is cost/FinOps-focused with savings calculations. OPA doesn't calculate $. |
-| **HashiCorp Sentinel** | Proprietary | Policy-as-code for Terraform | Locked to HCP/Terraform Cloud. SOFE is runtime (evaluates live infra, not just plans). |
-| **Infracost** | OSS | Cost estimation pre-deploy | Pre-deploy only. SOFE evaluates running infra + historical drift. Complementary. |
-| **AWS Config Rules** | AWS Native | Compliance rules on AWS resources | Limited to AWS, no cost focus, no CI/CD output, no portability. |
-| **Prowler** | OSS | Security & compliance scanning | Security-focused (CIS, PCI-DSS). Doesn't calculate cost savings or enforce FinOps. |
-| **Checkov** | OSS | IaC static analysis (Terraform, CF) | Pre-deploy only (scans .tf files). SOFE scans live resources. |
-| **Cloud Custodian** | OSS | Policy engine for cloud resources | Closest competitor. Actions (stop/terminate) built-in. SOFE is lighter, YAML-first, FinOps-focused. |
-| **Kubecost** | OSS/Paid | Kubernetes cost monitoring | K8s only. SOFE covers all AWS services. |
-| **Vantage** | SaaS | FinOps dashboard + alerts | Dashboard, not policy engine. No CI/CD. No custom rules. |
-| **CloudZero** | SaaS | Cost intelligence platform | Enterprise SaaS ($$$). No self-hosted. No policies-as-code. |
-| **Spot.io / NetApp** | SaaS | Cloud optimization + autoscaling | Optimization execution, not policy definition. Complementary. |
-| **Apptio Cloudability** | SaaS | Enterprise FinOps platform | Enterprise-only, expensive. No CI/CD integration. No code-first approach. |
-| **nOps** | SaaS | AWS cost optimization + scheduling | Automation focus. No declarative policies. |
-| **CAST AI** | SaaS | K8s cost optimization | K8s-only autoscaling. Not a policy engine. |
-
-### Complementary Tools (use alongside SOFE)
-
-| Tool | How it complements SOFE |
-|------|------------------------|
-| **Infracost** | Pre-deploy cost estimation → SOFE catches what slipped through post-deploy |
-| **Terraform / OpenTofu** | Defines infra → SOFE evaluates if running infra matches cost policies |
-| **AWS Cost Explorer** | Data source → SOFE collectors fetch from it |
-| **CloudWatch** | Metrics source → SOFE uses CPU, connections, invocations |
-| **Steampipe** | SQL-based cloud inventory → could be alternate data source for SOFE |
-| **Prometheus + Grafana** | Monitoring → SOFE could consume Prometheus metrics (future) |
-| **BYaML** | Architecture definitions → SOFE policies use same type system |
-| **byaml-finops-mcp** | MCP tools for AI assistants → SOFE findings feed into AI reasoning |
-| **FinOptix** | AI model for FinOps → explains SOFE findings in natural language |
-| **GitHub Actions / GitLab CI** | CI/CD → SOFE runs as pipeline step with `--fail-on` |
-| **Slack / PagerDuty** | Notifications → SOFE can webhook findings (future) |
-| **Neo4j** | Graph DB → SOFE findings + BYaML relationships = cost propagation graph (future) |
+| Cloud Custodian | 🟡 (not FinOps-first) | ✅ | ❌ | 🟡 | ✅ |
 
 ### The SOFE Position
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Cloud Cost Lifecycle                           │
-├─────────────┬──────────────┬──────────────────┬─────────────────┤
-│  PLAN       │  DEPLOY      │  RUN             │  OPTIMIZE       │
-│             │              │                  │                 │
-│ Infracost   │ Sentinel     │ ★ SOFE ★         │ Spot.io         │
-│ Checkov     │ OPA/Rego     │ Cloud Custodian  │ CAST AI         │
-│             │ Checkov      │ AWS Config       │ nOps            │
-│             │              │ Prowler          │ Kubecost        │
-├─────────────┴──────────────┴──────────────────┴─────────────────┤
-│  VISIBILITY: Vantage, CloudZero, Apptio, AWS Cost Explorer       │
-└─────────────────────────────────────────────────────────────────┘
+SOFE lives in the **RUN** phase: evaluate live infrastructure against declarative FinOps policies. Produce findings with dollar savings.
 
-SOFE lives in the RUN phase: evaluate LIVE infrastructure against
-declarative FinOps policies. Produce findings with dollar savings.
+```
+PLAN           DEPLOY       RUN               OPTIMIZE
+Infracost      OPA/Rego     ★ SOFE ★          Spot.io
+Checkov        Sentinel     Cloud Custodian   CAST AI
+                            AWS Config
 ```
 
-### Why SOFE vs Cloud Custodian?
+## BYaML Integration
 
-Cloud Custodian is the closest open source alternative. Key differences:
+SOFE uses [BYaML](https://byaml.org) component types (`aws.ec2`, `aws.s3`, etc.) — the same type system used for architecture governance. Policies reference the same types as your architecture definitions, and findings map directly to BYaML components.
 
-| | SOFE | Cloud Custodian |
-|--|------|----------------|
-| **Focus** | FinOps + cost governance | Security + compliance + ops |
-| **Policy format** | Clean YAML (Pydantic-validated) | Complex YAML with filters/actions DSL |
-| **Savings calculation** | Built-in ($ per finding) | Not included |
-| **BYaML integration** | Native (same type system) | None |
-| **AI reasoning** | FinOptix integration (future) | None |
-| **CI/CD** | `--fail-on` exit code | Requires wrapper |
-| **Scope** | AWS first, multi-cloud future | AWS + Azure + GCP |
-| **Maturity** | New (2026) | Mature (2016+, Capital One) |
+## Ecosystem
 
-SOFE is opinionated toward **FinOps** — every finding has a dollar amount. Cloud Custodian is a general-purpose policy engine that happens to work on cloud resources.
-
----
+| Project | Description |
+|---------|-------------|
+| [sofe-server](https://github.com/breakingthecloud/sofe-server) | REST API server (FastAPI) |
+| [sofe-cli](https://github.com/breakingthecloud/sofe-cli) | Go CLI (19 commands, TUI) |
+| [sofe-action](https://github.com/breakingthecloud/sofe-action) | GitHub Action |
+| [byaml-finops-mcp](https://github.com/breakingthecloud/byaml-finops-mcp) | MCP tools for AI FinOps |
+| [FinOptix](https://github.com/breakingthecloud/finoptix) | AI model for FinOps reasoning |
 
 ## License
 
@@ -335,15 +234,10 @@ Apache 2.0 — free to use, modify, and distribute.
 
 ---
 
-## Contributing
-
-1. Fork the repo
-2. Add a policy to `policies/` or a collector to `sofe/collectors/`
-3. Submit a PR
-
----
-
-## Built by
-
-[Carlos Cortez](https://cortez.cloud) — AWS Community Hero, CTO @ BWIT Solutions.
-Part of the [BYaML](https://byaml.org) ecosystem for cloud architecture governance.
+<p align="center">
+  Built by engineers who got tired of surprise AWS bills.<br>
+  <a href="https://sofe.dev">sofe.dev</a> · <a href="https://github.com/breakingthecloud/sofe">GitHub</a> · <a href="https://finoptix.dev">finoptix.dev</a>
+</p>
+<p align="center">
+  <sub>Write a policy once. Run it daily. Save money.</sub>
+</p>
