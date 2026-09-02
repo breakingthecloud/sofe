@@ -3,7 +3,7 @@
 S081 — requires these IAM actions on the SOFE reader role (CloudFormation stack):
   - ce:GetSavingsPlansUtilization
   - ce:GetSavingsPlansCoverage
-  - ce:GetReservedInstanceUtilization
+  - ce:GetReservationUtilization
 
 Graceful fallback: if CE not enabled / no permissions, all metrics = None (evaluation still works).
 CE API is global (us-east-1 only).
@@ -78,7 +78,7 @@ class CommitmentsCollector(BaseCollector):
 
         # --- Reserved Instance Utilization ---
         try:
-            resp = ce.get_reserved_instance_utilization(
+            resp = ce.get_reservation_utilization(
                 TimePeriod=self._period(),
                 Granularity="MONTHLY",
             )

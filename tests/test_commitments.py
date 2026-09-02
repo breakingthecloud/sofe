@@ -19,9 +19,9 @@ def _mock_session(sp_util=None, sp_cov=None, ri_util=None, raise_sp=False, raise
             "SavingsPlansCoverages": [{"SavingsPlansCoverage": {"CoveragePercentage": sp_cov or 0}}]
         }
     if raise_ri:
-        ce.get_reserved_instance_utilization.side_effect = Exception("CE not enabled")
+        ce.get_reservation_utilization.side_effect = Exception("CE not enabled")
     else:
-        ce.get_reserved_instance_utilization.return_value = {
+        ce.get_reservation_utilization.return_value = {
             "UtilizationsByTime": [{"Utilization": {"UtilizationPercentage": ri_util or 0}}]
         }
     session = MagicMock()
