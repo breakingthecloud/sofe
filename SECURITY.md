@@ -60,6 +60,7 @@ Severity legend: 🔴 Critical · 🟠 High · 🟡 Medium · 🟢 Good practice
 | 5.2 | Rotation plan: API keys, external IDs, cron secrets, web API keys on any exposure | 🔴 | |
 | 5.3 | `.dev.vars.example` committed instead of `.dev.vars` | 🟢 | |
 | 5.4 | Service accounts scoped to one project with `datastore` (or narrower) access | 🟢 | |
+| 5.5 | **Follow-up**: migrate Workers to Workload Identity Federation (OIDC) to avoid long-lived service-account keys (Google-recommended) | 🟡 | |
 
 ## 6. Client / CLI
 
