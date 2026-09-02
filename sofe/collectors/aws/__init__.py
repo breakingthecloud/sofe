@@ -18,6 +18,7 @@ from .route53 import Route53Collector
 from .secretsmanager import SecretsManagerCollector
 from .sagemaker import SageMakerCollector
 from .cost import CostCollector
+from .commitments import CommitmentsCollector
 
 # Registry: resource_type → Collector class
 COLLECTORS = {
@@ -39,6 +40,7 @@ COLLECTORS = {
     "aws.secretsmanager": SecretsManagerCollector,
     "aws.sagemaker": SageMakerCollector,
     "aws.cost": CostCollector,
+    "aws.commitments": CommitmentsCollector,
 }
 
 ALL_TYPES = list(COLLECTORS.keys())

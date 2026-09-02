@@ -31,6 +31,9 @@ def collect_all(profile: str = None, resource_types: list[str] = None, regions: 
     # Enrich with real costs from Cost Explorer
     _enrich_costs(session, resources, account_id)
 
+    # Enrich with commitment coverage/utilization (SP + RI)
+    _enrich_commitments(session, resources, account_id)
+
     # Tag-based metrics
     for r in resources:
         for key in ['owner', 'env', 'costCenter', 'Environment', 'Name']:
@@ -111,3 +114,27 @@ def _enrich_costs(session: boto3.Session, resources: list[Resource], account_id:
 
     except Exception:
         pass  # Graceful fallback — evaluation works without cost data
+
+
+def _enrich_commitments(session: boto3.Session, resources: list[Resource], account_id: str):
+    """Enrich resources with commitment coverage/utilization from Cost Explorer."""
+    from .aws.commitments import CommitmentsCollector
+
+    try:
+        collector = CommitmentsCollector(session=session, region="us-east-1", account_id=account_id)
+        collector.collect()
+        metrics = collector.get_metrics()
+
+        # Attach non-None metrics to each resource (account-level, but queryable per-resource)
+        for r in resources:
+            for k, v in metrics.items():
+                if v is not None:
+                    r.metrics[k] = v
+
+        # Log once (if any metric available)
+        shown = {k: v for k, v in metrics.items() if v is not None}
+        if shown:
+            print(f"  📊 Commitments: " + ", ".join(f"{k}={v:.1f}%" for k, v in shown.items()))
+
+    except Exception:
+        pass
