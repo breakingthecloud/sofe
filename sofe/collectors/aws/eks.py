@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class EKSCollector(BaseCollector):
@@ -36,5 +37,5 @@ class EKSCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  EKS scan failed in {self.region}: {e}")
+            print(f"  ⚠️  EKS scan failed in {self.region}: {e}", file=sys.stderr)
             return []

@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class ECSCollector(BaseCollector):
@@ -40,5 +41,5 @@ class ECSCollector(BaseCollector):
                     ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  ECS scan failed in {self.region}: {e}")
+            print(f"  ⚠️  ECS scan failed in {self.region}: {e}", file=sys.stderr)
             return []

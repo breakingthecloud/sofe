@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class APIGatewayCollector(BaseCollector):
@@ -50,5 +51,5 @@ class APIGatewayCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  API Gateway scan failed in {self.region}: {e}")
+            print(f"  ⚠️  API Gateway scan failed in {self.region}: {e}", file=sys.stderr)
             return []

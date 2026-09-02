@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class SageMakerCollector(BaseCollector):
@@ -46,5 +47,5 @@ class SageMakerCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  SageMaker scan failed in {self.region}: {e}")
+            print(f"  ⚠️  SageMaker scan failed in {self.region}: {e}", file=sys.stderr)
             return []

@@ -25,6 +25,9 @@ def evaluate(policies: list[Policy], resources: list[Resource], context: Archite
             if violation:
                 findings.append(violation)
 
+    # S082 — merge savings/rightsizing recommendation findings (collected during collect_all)
+    _merge_recommendation_findings(findings)
+
     # Add architecture insights as findings
     _add_architecture_findings(context, findings)
 
@@ -64,7 +67,28 @@ def evaluate_architecture(policies: list[Policy], resources: list[Resource]) -> 
     for owner in owners:
         insights["team_costs"][owner] = context.team_cost(owner)
 
+    # S082 — potential savings aggregate (the number that opens sales)
+    insights["potential_savings_monthly"] = round(
+        sum(f.estimated_savings or 0 for f in findings), 2
+    )
+
     return {"findings": findings, "insights": insights, "context": context}
+
+
+def _merge_recommendation_findings(findings: list[Finding]):
+    """Merge S082 recommendation findings (purchase/rightsize) into the finding list."""
+    try:
+        from ..collectors import get_recommendations
+
+        existing = {(f.policy_name, f.resource_id) for f in findings}
+        for rec in get_recommendations():
+            key = (rec.policy_name, rec.resource_id)
+            if key in existing:
+                continue
+            findings.append(rec)
+            existing.add(key)
+    except Exception:
+        pass
 
 
 def _filter_by_scope(resources: list[Resource], policy: Policy) -> list[Resource]:

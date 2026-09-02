@@ -25,9 +25,9 @@ def evaluate_cmd(policies, fmt, min_severity, fail_on, profile, dry_run):
     """Evaluate policies against live AWS resources."""
     from .collectors import collect_all
 
-    click.echo(f"📋 Loading policies from: {policies}")
+    click.echo(f"📋 Loading policies from: {policies}", err=True)
     policy_list = load_policies(policies)
-    click.echo(f"   Found {len(policy_list)} policies")
+    click.echo(f"   Found {len(policy_list)} policies", err=True)
 
     if dry_run:
         click.echo("\n🔍 DRY RUN — would evaluate:")
@@ -35,11 +35,11 @@ def evaluate_cmd(policies, fmt, min_severity, fail_on, profile, dry_run):
             click.echo(f"   • {p.metadata.name} ({p.spec.severity.value}) → {p.spec.scope.resource_types}")
         return
 
-    click.echo(f"\n☁️  Scanning AWS resources (profile: {profile or 'default'})...")
+    click.echo(f"\n☁️  Scanning AWS resources (profile: {profile or 'default'})...", err=True)
     resources = collect_all(profile=profile, resource_types=_get_required_types(policy_list))
-    click.echo(f"   Found {len(resources)} resources")
+    click.echo(f"   Found {len(resources)} resources", err=True)
 
-    click.echo(f"\n⚡ Evaluating {len(policy_list)} policies against {len(resources)} resources...")
+    click.echo(f"\n⚡ Evaluating {len(policy_list)} policies against {len(resources)} resources...", err=True)
     findings = evaluate(policy_list, resources)
 
     # Filter by severity

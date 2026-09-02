@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class SecretsManagerCollector(BaseCollector):
@@ -45,5 +46,5 @@ class SecretsManagerCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  SecretsManager scan failed in {self.region}: {e}")
+            print(f"  ⚠️  SecretsManager scan failed in {self.region}: {e}", file=sys.stderr)
             return []

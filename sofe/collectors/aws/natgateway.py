@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class NATGatewayCollector(BaseCollector):
@@ -33,5 +34,5 @@ class NATGatewayCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  NAT Gateway scan failed in {self.region}: {e}")
+            print(f"  ⚠️  NAT Gateway scan failed in {self.region}: {e}", file=sys.stderr)
             return []

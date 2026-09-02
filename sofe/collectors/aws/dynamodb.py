@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class DynamoDBCollector(BaseCollector):
@@ -43,5 +44,5 @@ class DynamoDBCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  DynamoDB scan failed in {self.region}: {e}")
+            print(f"  ⚠️  DynamoDB scan failed in {self.region}: {e}", file=sys.stderr)
             return []

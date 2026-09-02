@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 # Deprecated runtimes as of 2026
 DEPRECATED_RUNTIMES = {'python3.7', 'python3.8', 'nodejs14.x', 'nodejs16.x', 'dotnetcore3.1', 'ruby2.7', 'java8', 'go1.x'}
@@ -49,5 +50,5 @@ class LambdaCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  Lambda scan failed in {self.region}: {e}")
+            print(f"  ⚠️  Lambda scan failed in {self.region}: {e}", file=sys.stderr)
             return []

@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class S3Collector(BaseCollector):
@@ -75,5 +76,5 @@ class S3Collector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  S3 scan failed in {self.region}: {e}")
+            print(f"  ⚠️  S3 scan failed in {self.region}: {e}", file=sys.stderr)
             return []

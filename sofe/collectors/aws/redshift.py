@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class RedshiftCollector(BaseCollector):
@@ -37,5 +38,5 @@ class RedshiftCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  Redshift scan failed in {self.region}: {e}")
+            print(f"  ⚠️  Redshift scan failed in {self.region}: {e}", file=sys.stderr)
             return []

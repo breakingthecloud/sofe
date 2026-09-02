@@ -1,6 +1,7 @@
 """AWS ELB/ALB collector — load balancers with target, WAF, scheme metrics."""
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 class ELBCollector(BaseCollector):
     resource_type = "aws.elb"
@@ -33,5 +34,5 @@ class ELBCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  ELB scan failed in {self.region}: {e}")
+            print(f"  ⚠️  ELB scan failed in {self.region}: {e}", file=sys.stderr)
             return []

@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class Route53Collector(BaseCollector):
@@ -32,5 +33,5 @@ class Route53Collector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  Route53 scan failed: {e}")
+            print(f"  ⚠️  Route53 scan failed: {e}", file=sys.stderr)
             return []

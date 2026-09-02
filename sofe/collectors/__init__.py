@@ -1,14 +1,24 @@
 """AWS resource collectors for SOFE — scan resources + fetch metrics."""
 
 from __future__ import annotations
+import sys
 import boto3
 from datetime import datetime, timedelta
 from ..models import Resource
 from .aws import COLLECTORS, ALL_TYPES
 
+# S082 — recommendation findings collected during the last collect_all() run
+_RECOMMENDATION_FINDINGS: list = []
+
+
+def get_recommendations() -> list:
+    """Return recommendation findings (S082) from the last collect_all() run."""
+    return _RECOMMENDATION_FINDINGS
+
 
 def collect_all(profile: str = None, resource_types: list[str] = None, regions: list[str] = None) -> list[Resource]:
     """Collect resources from AWS using the given profile and modular collectors."""
+    global _RECOMMENDATION_FINDINGS
     session = boto3.Session(profile_name=profile) if profile else boto3.Session()
     account_id = session.client('sts').get_caller_identity()['Account']
     target_regions = regions or [session.region_name or 'us-east-1']
@@ -23,7 +33,7 @@ def collect_all(profile: str = None, resource_types: list[str] = None, regions: 
                 collected = collector.collect()
                 resources.extend(collected)
                 if collected:
-                    print(f"  ✓ {rtype}: {len(collected)} resources in {region}")
+                    print(f"  ✓ {rtype}: {len(collected)} resources in {region}", file=sys.stderr)
 
     # Enrich with metrics
     _enrich_metrics(session, resources, target_regions[0])
@@ -33,6 +43,9 @@ def collect_all(profile: str = None, resource_types: list[str] = None, regions: 
 
     # Enrich with commitment coverage/utilization (SP + RI)
     _enrich_commitments(session, resources, account_id)
+
+    # S082 — collect savings/rightsizing recommendations (findings)
+    _enrich_recommendations(session, account_id, target_regions)
 
     # Tag-based metrics
     for r in resources:
@@ -110,7 +123,7 @@ def _enrich_costs(session: boto3.Session, resources: list[Resource], account_id:
                 enriched += 1
 
         if enriched:
-            print(f"  💰 Cost data: {enriched}/{len(resources)} resources enriched (total: ${cost_collector.get_total_cost()}/mo)")
+            print(f"  💰 Cost data: {enriched}/{len(resources)} resources enriched (total: ${cost_collector.get_total_cost()}/mo)", file=sys.stderr)
 
     except Exception:
         pass  # Graceful fallback — evaluation works without cost data
@@ -134,7 +147,27 @@ def _enrich_commitments(session: boto3.Session, resources: list[Resource], accou
         # Log once (if any metric available)
         shown = {k: v for k, v in metrics.items() if v is not None}
         if shown:
-            print(f"  📊 Commitments: " + ", ".join(f"{k}={v:.1f}%" for k, v in shown.items()))
+            print(f"  📊 Commitments: " + ", ".join(f"{k}={v:.1f}%" for k, v in shown.items()), file=sys.stderr)
 
     except Exception:
         pass
+
+
+def _enrich_recommendations(session: boto3.Session, account_id: str, target_regions: list[str]):
+    """Collect savings/rightsizing recommendation findings (S082)."""
+    global _RECOMMENDATION_FINDINGS
+    from .aws.recommendations import RecommendationsCollector
+
+    try:
+        collector = RecommendationsCollector(
+            session=session,
+            region="us-east-1",
+            account_id=account_id,
+            target_regions=target_regions,
+        )
+        collector.collect()
+        _RECOMMENDATION_FINDINGS = collector.get_findings()
+        if _RECOMMENDATION_FINDINGS:
+            print(f"  💡 Recommendations: {len(_RECOMMENDATION_FINDINGS)} savings/rightsizing findings", file=sys.stderr)
+    except Exception:
+        _RECOMMENDATION_FINDINGS = []

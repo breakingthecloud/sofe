@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class CloudFrontCollector(BaseCollector):
@@ -46,5 +47,5 @@ class CloudFrontCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  CloudFront scan failed: {e}")
+            print(f"  ⚠️  CloudFront scan failed: {e}", file=sys.stderr)
             return []

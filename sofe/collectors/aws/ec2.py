@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class EC2Collector(BaseCollector):
@@ -43,5 +44,5 @@ class EC2Collector(BaseCollector):
                     ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  EC2 scan failed in {self.region}: {e}")
+            print(f"  ⚠️  EC2 scan failed in {self.region}: {e}", file=sys.stderr)
             return []

@@ -2,6 +2,7 @@
 
 from .base import BaseCollector
 from ...models import Resource
+import sys
 
 
 class ElastiCacheCollector(BaseCollector):
@@ -37,5 +38,5 @@ class ElastiCacheCollector(BaseCollector):
                 ))
             return resources
         except Exception as e:
-            print(f"  ⚠️  ElastiCache scan failed in {self.region}: {e}")
+            print(f"  ⚠️  ElastiCache scan failed in {self.region}: {e}", file=sys.stderr)
             return []
