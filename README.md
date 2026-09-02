@@ -24,7 +24,7 @@
   <img src="https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square&logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-Apache_2.0-8A2BE2?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/policies-10-success?style=flat-square" alt="10 policies">
-  <img src="https://img.shields.io/badge/collectors-18-blue?style=flat-square" alt="18 collectors">
+  <img src="https://img.shields.io/badge/collectors-19-blue?style=flat-square" alt="19 collectors">
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs">
 </p>
 
@@ -172,6 +172,9 @@ sofe evaluate --policies ./policies/ --format json > findings.json
 |--------|--------|-----------|
 | `avg_cpu_utilization` | CloudWatch (30d avg) | EC2, RDS |
 | `monthly_cost` | Cost Explorer | All |
+| `sp_coverage_pct` | Cost Explorer (Savings Plans) | All (account-level) |
+| `sp_utilization_pct` | Cost Explorer (Savings Plans) | All (account-level) |
+| `ri_utilization_pct` | Cost Explorer (RI) | All (account-level) |
 | `running_days` | LaunchTime | EC2, RDS |
 | `has_tag:{key}` | Tags API | All |
 | `storage_used_gb` | CloudWatch | S3, EBS |
