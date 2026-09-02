@@ -23,7 +23,7 @@
   <img src="https://img.shields.io/pypi/v/sofe?style=flat-square&logo=pypi&color=8A2BE2" alt="PyPI">
   <img src="https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square&logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-Apache_2.0-8A2BE2?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/policies-10-success?style=flat-square" alt="10 policies">
+  <img src="https://img.shields.io/badge/policies-39-success?style=flat-square" alt="39 policies">
   <img src="https://img.shields.io/badge/collectors-19-blue?style=flat-square" alt="19 collectors">
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs">
 </p>
