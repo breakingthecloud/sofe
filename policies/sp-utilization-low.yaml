@@ -1,0 +1,17 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: sp-utilization-low
+  description: Savings Plans utilization below 70% — over-committed
+  tags: [savings, commitment]
+spec:
+  scope:
+    resource_types: ["aws.account"]
+  rule:
+    metric: sp_utilization_pct
+    operator: "<"
+    threshold: 70
+  severity: high
+  actions:
+    - type: finding
+      suggestion: "SP al 70% o menos de utilización — estás pagando por capacidad que no usas"

@@ -1,0 +1,17 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: ri-utilization-low
+  description: Reserved Instance utilization below 80% — wasted commitment
+  tags: [savings, commitment]
+spec:
+  scope:
+    resource_types: ["aws.account"]
+  rule:
+    metric: ri_utilization_pct
+    operator: "<"
+    threshold: 80
+  severity: medium
+  actions:
+    - type: finding
+      suggestion: "RI al 80% o menos de utilización — rightsize o revisa si puedes vender/ajustar el compromiso"

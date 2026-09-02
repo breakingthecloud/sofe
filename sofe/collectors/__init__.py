@@ -42,7 +42,7 @@ def collect_all(profile: str = None, resource_types: list[str] = None, regions: 
     _enrich_costs(session, resources, account_id)
 
     # Enrich with commitment coverage/utilization (SP + RI)
-    _enrich_commitments(session, resources, account_id)
+    commit_metrics = _enrich_commitments(session, resources, account_id)
 
     # S082 — collect savings/rightsizing recommendations (findings)
     _enrich_recommendations(session, account_id, target_regions)
@@ -51,6 +51,10 @@ def collect_all(profile: str = None, resource_types: list[str] = None, regions: 
     for r in resources:
         for key in ['owner', 'env', 'costCenter', 'Environment', 'Name']:
             r.metrics[f'has_tag:{key}'] = 1.0 if key in r.tags else 0.0
+
+    # S083 — synthetic account resource (account-level metrics for savings policies)
+    account_resource = _build_account_resource(account_id, commit_metrics, target_regions[0])
+    resources.append(account_resource)
 
     return resources
 
@@ -129,8 +133,11 @@ def _enrich_costs(session: boto3.Session, resources: list[Resource], account_id:
         pass  # Graceful fallback — evaluation works without cost data
 
 
-def _enrich_commitments(session: boto3.Session, resources: list[Resource], account_id: str):
-    """Enrich resources with commitment coverage/utilization from Cost Explorer."""
+def _enrich_commitments(session: boto3.Session, resources: list[Resource], account_id: str) -> dict[str, float | None]:
+    """Enrich resources with commitment coverage/utilization from Cost Explorer.
+
+    Returns the commitment metrics dict (S081) for account-level aggregation.
+    """
     from .aws.commitments import CommitmentsCollector
 
     try:
@@ -149,8 +156,33 @@ def _enrich_commitments(session: boto3.Session, resources: list[Resource], accou
         if shown:
             print(f"  📊 Commitments: " + ", ".join(f"{k}={v:.1f}%" for k, v in shown.items()), file=sys.stderr)
 
+        return metrics
+
     except Exception:
-        pass
+        return {}
+
+
+def _build_account_resource(account_id: str, commit_metrics: dict[str, float | None], region: str) -> Resource:
+    """Synthetic account-level resource (S083) carrying savings metrics for policies.
+
+    Policies scope to resource_types: [aws.account] to evaluate the account ONCE.
+    """
+    metrics: dict[str, float] = {}
+    for k, v in commit_metrics.items():
+        if v is not None:
+            metrics[k] = v
+    potential = sum(f.estimated_savings or 0 for f in get_recommendations())
+    metrics["potential_savings_monthly"] = round(potential, 2)
+
+    return Resource(
+        resource_id=f"account-{account_id}",
+        resource_type="aws.account",
+        region=region,
+        account_id=account_id,
+        tags={},
+        properties={},
+        metrics=metrics,
+    )
 
 
 def _enrich_recommendations(session: boto3.Session, account_id: str, target_regions: list[str]):

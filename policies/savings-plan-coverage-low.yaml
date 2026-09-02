@@ -1,0 +1,17 @@
+apiVersion: sofe/v1
+kind: Policy
+metadata:
+  name: savings-plan-coverage-low
+  description: Savings Plans coverage below 90% — leaving money on the table
+  tags: [savings, commitment]
+spec:
+  scope:
+    resource_types: ["aws.account"]
+  rule:
+    metric: sp_coverage_pct
+    operator: "<"
+    threshold: 90
+  severity: medium
+  actions:
+    - type: finding
+      suggestion: "Cobertura Savings Plans por debajo de 90% — considera comprar un SP (revisa las recomendaciones)"
