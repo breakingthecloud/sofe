@@ -139,7 +139,11 @@ def _check_rule(resource: Resource, policy: Policy, context: ArchitectureContext
 
     # Check additional conditions (AND logic)
     for cond in rule.additional_conditions:
-        cond_value = resource.metrics.get(cond.field) or resource.properties.get(cond.field)
+        # Use explicit None checks — a valid 0.0 metric is falsy and must NOT
+        # fall through to properties (that dropped `== 0` conditions silently).
+        cond_value = resource.metrics.get(cond.field)
+        if cond_value is None:
+            cond_value = resource.properties.get(cond.field)
         if cond_value is None:
             return None  # Missing data — skip
         if not _apply_operator(float(cond_value), cond.operator, float(cond.value)):
