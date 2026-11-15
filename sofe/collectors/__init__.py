@@ -82,8 +82,10 @@ def collect_all(
     # S082 — collect savings/rightsizing recommendations (findings)
     _enrich_recommendations(session, account_id, target_regions)
 
-    # Tag-based metrics
+    # Tag-based metrics (skipped when the tags could not be read: unknown is not "missing")
     for r in resources:
+        if 'tags' in (r.properties.get('unchecked') or []):
+            continue
         for key in ['owner', 'env', 'costCenter', 'Environment', 'Name']:
             r.metrics[f'has_tag:{key}'] = 1.0 if key in r.tags else 0.0
 
