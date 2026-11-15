@@ -11,11 +11,29 @@ IAM required on the SOFE reader role:
 
 from __future__ import annotations
 
+import sys
 import uuid
 from datetime import datetime, timezone
 
+from botocore.exceptions import ClientError
+
 from ..aws.base import BaseCollector
 from ...models import Finding, Resource, Severity
+
+
+# S113 — values the Cost Explorer API actually accepts (botocore model). The previous code sent
+# "COMPUTE"/"EC2_INSTANCE", "1", "30" and "SHARED": every request was rejected and the error swallowed.
+SP_TYPES = {"COMPUTE_SP": "Compute", "EC2_INSTANCE_SP": "EC2 Instance"}   # enum -> label for messages
+SP_TERM = "ONE_YEAR"
+SP_LOOKBACK = "THIRTY_DAYS"
+SP_PAYMENT = "NO_UPFRONT"
+# We evaluate ONE account at a time. PAYER would add the whole organization to a management account.
+SP_ACCOUNT_SCOPE = "LINKED"
+# Rightsizing: stay in the same instance family (no cross-family migrations suggested).
+RIGHTSIZING_TARGET = "SAME_INSTANCE_FAMILY"
+
+# Error codes that mean "this account has nothing to recommend / feature not enabled", not a bug.
+_EXPECTED = {"DataUnavailableException", "OptInRequired"}
 
 
 class RecommendationsCollector(BaseCollector):
@@ -27,6 +45,7 @@ class RecommendationsCollector(BaseCollector):
         super().__init__(session, region, account_id)
         self.target_regions = target_regions or ["us-east-1"]
         self._findings: list[Finding] = []
+        self._errors: list[tuple[str, str]] = []  # (source, error code), never the AWS message
 
     def collect(self) -> list[Resource]:
         """Query CE recommendations and convert to SOFE findings."""
@@ -36,29 +55,30 @@ class RecommendationsCollector(BaseCollector):
             return []
 
         self._findings = []
+        self._errors = []
         seen: set[tuple] = set()
 
-        # --- Savings Plans Purchase Recommendations ---
-        try:
-            for spp_type in ["COMPUTE", "EC2_INSTANCE"]:
+        # --- Savings Plans Purchase Recommendations (each type on its own: one failing must not skip the other) ---
+        for spp_type, label in SP_TYPES.items():
+            try:
                 resp = ce.get_savings_plans_purchase_recommendation(
                     SavingsPlansType=spp_type,
-                    LookbackPeriodInDays="30",
-                    TermInYears="1",
-                    PaymentOption="NO_UPFRONT",
-                    AccountScope="SHARED",
+                    LookbackPeriodInDays=SP_LOOKBACK,
+                    TermInYears=SP_TERM,
+                    PaymentOption=SP_PAYMENT,
+                    AccountScope=SP_ACCOUNT_SCOPE,
                 )
                 recs = resp.get("SavingsPlansPurchaseRecommendation", {})
                 details = recs.get("SavingsPlansPurchaseRecommendationDetails", [])
                 for d in details:
-                    f = self._purchase_finding(d, spp_type)
+                    f = self._purchase_finding(d, label)
                     key = (f.policy_name, f.resource_id, round(f.estimated_savings or 0, 2))
                     if key in seen:
                         continue
                     seen.add(key)
                     self._findings.append(f)
-        except Exception:
-            pass
+            except Exception as e:
+                self._record_error(f"savings-plans:{spp_type}", e)
 
         # --- Rightsizing Recommendations (per region) ---
         for region in self.target_regions:
@@ -67,7 +87,7 @@ class RecommendationsCollector(BaseCollector):
                 while True:
                     kwargs = {
                         "Service": "AmazonEC2",
-                        "Configuration": {"BenefitsConsidered": True},
+                        "Configuration": {"RecommendationTarget": RIGHTSIZING_TARGET, "BenefitsConsidered": True},
                         "Filter": {"Dimensions": {"Key": "REGION", "Values": [region]}},
                     }
                     if token:
@@ -85,12 +105,13 @@ class RecommendationsCollector(BaseCollector):
                     token = resp.get("NextPageToken")
                     if not token:
                         break
-            except Exception:
+            except Exception as e:
+                self._record_error(f"rightsizing:{region}", e)
                 continue
 
         return []  # meta-collector: findings exposed via get_findings()
 
-    def _purchase_finding(self, detail: dict, spp_type: str) -> Finding:
+    def _purchase_finding(self, detail: dict, spp_type: str) -> Finding:  # spp_type is the human label (e.g. 'Compute')
         monthly = float(detail.get("EstimatedMonthlySavingsAmount", 0) or 0)
         upfront = float(detail.get("UpfrontCost", 0) or 0)
         roi = round(upfront / monthly, 1) if monthly > 0 else None
@@ -165,6 +186,20 @@ class RecommendationsCollector(BaseCollector):
             remediation_eligible=False,
             timestamp=datetime.now(timezone.utc),
         )
+
+    def _record_error(self, source: str, exc: Exception) -> None:
+        """Make a failed request visible (it used to be swallowed, which hid a total outage for months).
+
+        Only the error code is kept/logged: AWS messages can embed role and account ARNs.
+        """
+        code = exc.response.get("Error", {}).get("Code", "ClientError") if isinstance(exc, ClientError) else type(exc).__name__
+        self._errors.append((source, code))
+        level = "ℹ️ " if code in _EXPECTED else "⚠️ "
+        print(f"  {level} recommendations({source}): {code}", file=sys.stderr)
+
+    def get_errors(self) -> list[tuple[str, str]]:
+        """(source, error code) for every request that failed in the last collect()."""
+        return list(self._errors)
 
     def get_findings(self) -> list[Finding]:
         return getattr(self, "_findings", [])
