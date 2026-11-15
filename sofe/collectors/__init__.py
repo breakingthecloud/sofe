@@ -16,10 +16,23 @@ def get_recommendations() -> list:
     return _RECOMMENDATION_FINDINGS
 
 
-def collect_all(profile: str = None, resource_types: list[str] = None, regions: list[str] = None) -> list[Resource]:
-    """Collect resources from AWS using the given profile and modular collectors."""
+def collect_all(
+    profile: str = None,
+    resource_types: list[str] = None,
+    regions: list[str] = None,
+    session: boto3.Session | None = None,
+) -> list[Resource]:
+    """Collect resources from AWS using modular collectors.
+
+    Credentials come from, in order of precedence:
+      1. ``session`` — an already-built boto3 session (e.g. temporary credentials
+         from an assumed role, S111). Used as-is; ``profile`` is ignored.
+      2. ``profile`` — a named local AWS profile.
+      3. The default boto3 credential chain.
+    """
     global _RECOMMENDATION_FINDINGS
-    session = boto3.Session(profile_name=profile) if profile else boto3.Session()
+    if session is None:
+        session = boto3.Session(profile_name=profile) if profile else boto3.Session()
     account_id = session.client('sts').get_caller_identity()['Account']
     target_regions = regions or [session.region_name or 'us-east-1']
     types = resource_types or ALL_TYPES
