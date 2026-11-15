@@ -11,6 +11,7 @@ returned a bucket, and every failed check was recorded as ``0.0``. Both are fixe
   reporting a violation nobody verified.
 """
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from botocore.exceptions import ClientError
@@ -41,8 +42,13 @@ class S3Collector(BaseCollector):
     # buckets, and the hosted API gateway cuts the evaluation at 30 s. boto3 clients are thread-safe;
     # 10 matches urllib3's default connection pool, so no "pool is full" warnings.
     MAX_WORKERS = 10
+    # The hosted API gateway answers 504 after 30 s however long the Lambda keeps running. Once this budget
+    # is spent the remaining checks are not attempted and are reported as unchecked: the evaluation still
+    # finishes in time, and policies skip what was not verified instead of evaluating nothing or guessing.
+    TIME_BUDGET_SECONDS = 10.0
 
     def collect(self) -> list[Resource]:
+        self._deadline = time.monotonic() + self.TIME_BUDGET_SECONDS
         try:
             s3 = self.session.client('s3', region_name=self.region)
             buckets = self._list_buckets(s3)
@@ -111,6 +117,9 @@ class S3Collector(BaseCollector):
 
         def check(label, call, on_answer, absent_value=None):
             """Run one check. Answer -> metric; known 'absent' error -> absent_value; otherwise unchecked."""
+            if time.monotonic() > self._deadline:
+                unchecked.append(label)  # out of time budget: not attempted
+                return
             try:
                 on_answer(call())
             except ClientError as e:

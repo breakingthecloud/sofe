@@ -368,3 +368,27 @@ class TestParallelChecks:
 
         assert [r.resource_id for r in out] == ["ok-1", "ok-2"]
         assert "S3 bucket skipped" in capsys.readouterr().err
+
+
+class TestTimeBudget:
+    def test_when_the_budget_is_spent_buckets_are_listed_but_unchecked_and_no_call_is_made(self, monkeypatch):
+        monkeypatch.setattr(S3Collector, "TIME_BUDGET_SECONDS", -1.0)  # already over budget
+        c = TestParallelChecks._fake_client(["a", "b"])
+
+        out = collector(c).collect()
+
+        assert [r.resource_id for r in out] == ["a", "b"]  # inventoried
+        for r in out:
+            assert r.metrics == {}                          # nothing invented
+            assert r.properties["unchecked"] == ["encryption", "lifecycle", "versioning", "public_access_block", "logging", "tags"]
+        for call in (c.get_bucket_encryption, c.get_bucket_versioning, c.get_public_access_block, c.get_bucket_tagging):
+            assert call.call_count == 0
+
+    def test_buckets_over_budget_do_not_fire_policies(self, monkeypatch):
+        monkeypatch.setattr(S3Collector, "TIME_BUDGET_SECONDS", -1.0)
+        out = collector(TestParallelChecks._fake_client(["a"])).collect()
+
+        assert {f.policy_name for f in evaluate(policies(), out)} == set()
+
+    def test_the_default_budget_is_comfortably_below_the_gateway_limit(self):
+        assert 0 < S3Collector.TIME_BUDGET_SECONDS <= 12  # the hosted API gateway cuts at 30 s
