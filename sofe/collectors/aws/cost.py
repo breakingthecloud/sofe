@@ -1,15 +1,55 @@
-"""Cost Explorer collector — fetches real monthly costs per resource from AWS."""
+"""Cost Explorer collector — fetches real monthly costs per resource from AWS.
+
+S111 Phase B: the collector reports WHY it has (or has not) cost data
+(``get_status()``), restricts the query to the evaluated account, and never invents
+a number: a resource without a Cost Explorer match has no ``monthly_cost`` at all.
+"""
 
 from __future__ import annotations
+import re
+import sys
 from datetime import datetime, timedelta
+from botocore.exceptions import ClientError
 from ..aws.base import BaseCollector
 from ...models import Resource
+
+# cost_status values (also exposed by sofe-server /evaluate)
+COST_OK = "ok"                      # data received and (almost) all spend matched to inventoried resources
+COST_PARTIAL = "partial"            # data received, but part of the spend is not matched to a resource
+COST_ACCESS_DENIED = "access_denied"  # the role cannot call Cost Explorer
+COST_NOT_ENABLED = "not_enabled"    # Cost Explorer / resource-level data is not enabled for the account
+COST_NO_DATA = "no_data"            # the call worked but there is no spend in the period
+COST_ERROR = "error"                # anything else (throttling, network, ...)
+
+COST_PERIOD_DAYS = 7                # Cost Explorer resource-level data: we read 7 days and extrapolate to 30
+MAX_PAGES = 50                      # safety net against a pagination loop
+EXCLUDED_RECORD_TYPES = ["Credit", "Refund", "Tax"]
+
+
+def classify_ce_error(exc: Exception) -> tuple[str, str]:
+    """Map a Cost Explorer failure to (cost_status, short detail).
+
+    The detail never contains the AWS error message: those embed role/account ARNs
+    (possibly of other accounts). Only the error code and, for IAM denials, the action.
+    """
+    code, msg = "", str(exc)
+    if isinstance(exc, ClientError):
+        err = exc.response.get("Error", {})
+        code, msg = err.get("Code", ""), err.get("Message", "") or ""
+    low = msg.lower()
+
+    if "not enabled for cost explorer" in low or code in ("DataUnavailableException", "OptInRequired"):
+        return COST_NOT_ENABLED, code or "CostExplorerNotEnabled"
+    if code.startswith("AccessDenied") or code in ("UnauthorizedOperation", "UnauthorizedAccess"):
+        action = re.search(r"perform:\s*([a-z0-9-]+:[A-Za-z0-9*]+)", msg)
+        return COST_ACCESS_DENIED, f"{code}: {action.group(1)}" if action else code
+    return COST_ERROR, code or type(exc).__name__
 
 
 class CostCollector(BaseCollector):
     """Meta-collector that queries Cost Explorer for per-resource costs.
-    
-    Does NOT create resources — enriches existing ones with monthly_cost metric.
+
+    Does NOT create resources — enriches existing ones with the monthly_cost metric.
     Must run AFTER all other collectors have finished.
     """
 
@@ -17,87 +57,93 @@ class CostCollector(BaseCollector):
 
     def collect(self) -> list[Resource]:
         """Query Cost Explorer for per-resource costs (last 7 days, extrapolated to monthly).
-        
-        Returns empty list — this collector enriches, doesn't create resources.
-        Call get_cost_map() after collect() to get the cost data.
+
+        Returns an empty list — this collector enriches, it does not create resources.
+        Afterwards use get_status() / get_detail() / get_cost_map().
         """
+        self._cost_map: dict[str, float] = {}
+        self._reverse_index: dict[str, float] = {}
+        self._status = COST_NO_DATA
+        self._detail = ""
+        self._requests = 0
+
         try:
             # Cost Explorer API is global (only us-east-1)
             ce = self.session.client("ce", region_name="us-east-1")
-
             end = datetime.utcnow().date()
-            start = end - timedelta(days=7)
+            start = end - timedelta(days=COST_PERIOD_DAYS)
+            flt = self._filter()
 
-            response = ce.get_cost_and_usage_with_resources(
-                TimePeriod={
-                    "Start": start.isoformat(),
-                    "End": end.isoformat(),
-                },
-                Granularity="DAILY",
-                Metrics=["UnblendedCost"],
-                GroupBy=[
-                    {"Type": "DIMENSION", "Key": "RESOURCE_ID"},
-                ],
-                Filter={
-                    "Not": {
-                        "Dimensions": {
-                            "Key": "RECORD_TYPE",
-                            "Values": ["Credit", "Refund", "Tax"],
-                        }
-                    }
-                },
-            )
-
-            # Parse costs per resource ID (sum all days, then extrapolate to monthly)
-            self._cost_map: dict[str, float] = {}
-            for result in response.get("ResultsByTime", []):
-                for group in result.get("Groups", []):
-                    resource_id = group["Keys"][0]
-                    amount = float(group["Metrics"]["UnblendedCost"]["Amount"])
-                    if amount > 0:
-                        self._cost_map[resource_id] = self._cost_map.get(resource_id, 0) + amount
-
-            # Handle pagination
-            while response.get("NextPageToken"):
-                response = ce.get_cost_and_usage_with_resources(
+            cost_7d: dict[str, float] = {}
+            token = None
+            for _ in range(MAX_PAGES):
+                kwargs = dict(
                     TimePeriod={"Start": start.isoformat(), "End": end.isoformat()},
                     Granularity="DAILY",
                     Metrics=["UnblendedCost"],
                     GroupBy=[{"Type": "DIMENSION", "Key": "RESOURCE_ID"}],
-                    Filter={"Not": {"Dimensions": {"Key": "RECORD_TYPE", "Values": ["Credit", "Refund", "Tax"]}}},
-                    NextPageToken=response["NextPageToken"],
+                    Filter=flt,
                 )
+                if token:
+                    kwargs["NextPageToken"] = token
+                response = ce.get_cost_and_usage_with_resources(**kwargs)
+                self._requests += 1
                 for result in response.get("ResultsByTime", []):
                     for group in result.get("Groups", []):
-                        resource_id = group["Keys"][0]
                         amount = float(group["Metrics"]["UnblendedCost"]["Amount"])
                         if amount > 0:
-                            self._cost_map[resource_id] = self._cost_map.get(resource_id, 0) + amount
+                            rid = group["Keys"][0]
+                            cost_7d[rid] = cost_7d.get(rid, 0) + amount
+                token = response.get("NextPageToken")
+                if not token:
+                    break
+            else:
+                raise RuntimeError("Cost Explorer pagination limit reached")
 
-            # Extrapolate 7-day cost to monthly (x 30/7 ≈ x 4.29)
-            # Only keep resources with meaningful cost (> $0.001/month)
-            monthly_map: dict[str, float] = {}
-            for rid, cost_7d in self._cost_map.items():
-                monthly = cost_7d * (30 / 7)
+            # Extrapolate the 7-day cost to a month (x 30/7). Keep only meaningful amounts (> $0.001/month).
+            for rid, c in cost_7d.items():
+                monthly = c * (30 / COST_PERIOD_DAYS)
                 if monthly > 0.001:
-                    monthly_map[rid] = round(monthly, 2)
-            self._cost_map = monthly_map
+                    self._cost_map[rid] = round(monthly, 2)
 
-            # Build reverse index: extract short resource IDs from ARNs
-            self._reverse_index: dict[str, float] = {}
+            # Reverse index: short resource ids extracted from ARNs
             for arn, cost in self._cost_map.items():
                 short_id = self._extract_resource_id(arn)
                 if short_id and short_id != arn:
                     self._reverse_index[short_id] = self._reverse_index.get(short_id, 0) + cost
 
+            self._status = COST_OK if self._cost_map else COST_NO_DATA
+
         except Exception as e:
-            # Cost Explorer not enabled, no permissions, or other error
-            # Graceful fallback — evaluation still works without cost data
-            self._cost_map = {}
-            import sys
-            print(f"  ⚠️ Cost collector error: {e}", file=sys.stderr)
+            self._cost_map, self._reverse_index = {}, {}
+            self._status, self._detail = classify_ce_error(e)
+            print(f"  ⚠️ Cost Explorer unavailable: {self._status} ({self._detail})", file=sys.stderr)
 
         return []  # This collector doesn't create resources
+
+    def _filter(self) -> dict:
+        """Exclude credits/refunds/tax, and (S111) restrict to the evaluated account.
+
+        Without LINKED_ACCOUNT, a management (payer) account receives the resources of
+        EVERY member account, so same-named resources of other accounts could be
+        matched against this account's inventory.
+        """
+        base = {"Not": {"Dimensions": {"Key": "RECORD_TYPE", "Values": EXCLUDED_RECORD_TYPES}}}
+        if not self.account_id:
+            return base
+        return {"And": [base, {"Dimensions": {"Key": "LINKED_ACCOUNT", "Values": [self.account_id]}}]}
+
+    def get_status(self) -> str:
+        """cost_status after collect(): ok | no_data | access_denied | not_enabled | error."""
+        return getattr(self, "_status", COST_NO_DATA)
+
+    def get_detail(self) -> str:
+        """Short, ARN-free reason when the status is not ok."""
+        return getattr(self, "_detail", "")
+
+    def request_count(self) -> int:
+        """Cost Explorer requests made by collect() (each is billed ~$0.01)."""
+        return getattr(self, "_requests", 0)
 
     def get_cost_map(self) -> dict[str, float]:
         """Return the cost map after collect() has been called."""

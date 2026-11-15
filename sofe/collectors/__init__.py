@@ -11,6 +11,28 @@ from .aws import COLLECTORS, ALL_TYPES
 _RECOMMENDATION_FINDINGS: list = []
 
 
+# Meta-collectors: they enrich resources / expose account-level data, they do not inventory
+# anything. They run ONCE through _enrich_costs / _enrich_commitments, never in the resource loop
+# (running them in the loop too doubled every Cost Explorer request, and once per region).
+_META_TYPES = frozenset({"aws.cost", "aws.commitments"})
+
+# Cost Explorer API requests per evaluation (AWS bills ~$0.01 per request), assuming no pagination:
+#   cost 1 + commitments 3 (SP utilization, SP coverage, RI utilization)
+#   + recommendations 2 (Savings Plans COMPUTE / EC2_INSTANCE) + 1 rightsizing per region
+_CE_REQUESTS_FIXED = 6
+
+
+def expected_ce_requests(regions: int = 1) -> int:
+    """Minimum Cost Explorer requests one evaluation makes (more if a response is paginated)."""
+    return _CE_REQUESTS_FIXED + max(1, regions)
+
+
+CE_REQUESTS_PER_EVALUATION = expected_ce_requests(1)  # 7 for the default single region
+
+# cost_status becomes "ok" when at least this share of the account's spend is matched to inventoried resources
+COST_OK_MIN_COVERAGE_USD = 0.95
+
+
 def get_recommendations() -> list:
     """Return recommendation findings (S082) from the last collect_all() run."""
     return _RECOMMENDATION_FINDINGS
@@ -41,7 +63,7 @@ def collect_all(
 
     for region in target_regions:
         for rtype in types:
-            if rtype in COLLECTORS:
+            if rtype in COLLECTORS and rtype not in _META_TYPES:
                 collector = COLLECTORS[rtype](session=session, region=region, account_id=account_id)
                 collected = collector.collect()
                 resources.extend(collected)
@@ -51,8 +73,8 @@ def collect_all(
     # Enrich with metrics
     _enrich_metrics(session, resources, target_regions[0])
 
-    # Enrich with real costs from Cost Explorer
-    _enrich_costs(session, resources, account_id)
+    # Enrich with real costs from Cost Explorer (never invents a number; reports why when it can't)
+    cost_summary = _enrich_costs(session, resources, account_id)
 
     # Enrich with commitment coverage/utilization (SP + RI)
     commit_metrics = _enrich_commitments(session, resources, account_id)
@@ -66,17 +88,20 @@ def collect_all(
             r.metrics[f'has_tag:{key}'] = 1.0 if key in r.tags else 0.0
 
     # S083 — synthetic account resource (account-level metrics for savings policies)
-    account_resource = _build_account_resource(account_id, commit_metrics, target_regions[0])
+    account_resource = _build_account_resource(account_id, commit_metrics, target_regions[0], cost_summary)
     resources.append(account_resource)
 
     return resources
 
 
 def _enrich_metrics(session: boto3.Session, resources: list[Resource], region: str):
-    """Fetch CloudWatch metrics for resources (CPU, cost)."""
+    """Fetch CloudWatch metrics for resources (CPU, running days).
+
+    Cost is NOT handled here: dividing the account total equally among resources produced
+    invented per-resource numbers (S111 B1). Real costs come from _enrich_costs().
+    """
     try:
         cw = session.client('cloudwatch', region_name=region)
-        ce = session.client('ce', region_name='us-east-1')
         now = datetime.utcnow()
         start = now - timedelta(days=30)
 
@@ -101,49 +126,76 @@ def _enrich_metrics(session: boto3.Session, resources: list[Resource], region: s
                     r.metrics['running_days'] = (now - launch.replace(tzinfo=None)).days
                 except:
                     pass
-
-        # Monthly cost per resource — now handled by _enrich_costs() via CostCollector
-        # (keeping this as fallback for accounts without ce:GetCostAndUsageWithResources)
-        try:
-            s = (now.replace(day=1) - timedelta(days=1)).replace(day=1).strftime('%Y-%m-%d')
-            e = now.replace(day=1).strftime('%Y-%m-%d')
-            resp = ce.get_cost_and_usage(TimePeriod={'Start': s, 'End': e}, Granularity='MONTHLY', Metrics=['UnblendedCost'])
-            total = float(resp['ResultsByTime'][0]['Total']['UnblendedCost']['Amount'])
-            if resources and not any(r.metrics.get('monthly_cost') for r in resources):
-                # Only apply naïve distribution if CostCollector didn't run
-                per_resource = total / len(resources)
-                for r in resources:
-                    r.metrics.setdefault('monthly_cost', round(per_resource, 2))
-        except:
-            pass
     except:
         pass
 
 
-def _enrich_costs(session: boto3.Session, resources: list[Resource], account_id: str):
-    """Enrich resources with real per-resource costs from Cost Explorer."""
-    from .aws.cost import CostCollector
+def _enrich_costs(session: boto3.Session, resources: list[Resource], account_id: str) -> dict:
+    """Enrich resources with real per-resource costs from Cost Explorer (S111 Phase B).
 
+    Sets ``monthly_cost`` ONLY on resources that Cost Explorer matched. Everything else
+    stays without the metric: policies then skip the rule instead of evaluating an
+    invented number, and findings get no made-up ``estimated_savings``.
+
+    Always returns a summary describing what happened (never raises):
+      cost_status          ok | partial | access_denied | not_enabled | no_data | error
+      cost_detail          short ARN-free reason when there is no (or partial) data
+      cost_coverage        matched resources / inventoried resources            (None if no data)
+      cost_coverage_usd    matched spend / account spend in Cost Explorer       (None if no data)
+      cost_account_monthly Cost Explorer monthly spend of THIS account          (None if no data)
+      cost_matched_monthly sum of monthly_cost over the matched resources
+    """
+    from .aws.cost import CostCollector, COST_OK, COST_PARTIAL
+
+    summary: dict = {
+        "cost_status": "error",
+        "cost_detail": "",
+        "cost_coverage": None,
+        "cost_coverage_usd": None,
+        "cost_account_monthly": None,
+        "cost_matched_monthly": 0.0,
+    }
     try:
-        cost_collector = CostCollector(session=session, region="us-east-1", account_id=account_id)
-        cost_collector.collect()
-        cost_map = cost_collector.get_cost_map()
+        collector = CostCollector(session=session, region="us-east-1", account_id=account_id)
+        collector.collect()
+        summary["cost_status"] = collector.get_status()
+        summary["cost_detail"] = collector.get_detail()
 
+        cost_map = collector.get_cost_map()
         if not cost_map:
-            return  # No cost data available (permission denied or CE not enabled)
+            if summary["cost_status"] == "no_data":
+                summary["cost_account_monthly"] = 0.0  # the call worked: the account has no spend
+            return summary  # access_denied / not_enabled / error / no_data: no per-resource cost
 
-        enriched = 0
+        enriched, matched = 0, 0.0
         for r in resources:
-            cost = cost_collector.get_cost_for_resource(r.resource_id)
+            cost = collector.get_cost_for_resource(r.resource_id)
             if cost is not None:
-                r.metrics['monthly_cost'] = cost
+                r.metrics["monthly_cost"] = cost
                 enriched += 1
+                matched += cost
 
-        if enriched:
-            print(f"  💰 Cost data: {enriched}/{len(resources)} resources enriched (total: ${cost_collector.get_total_cost()}/mo)", file=sys.stderr)
+        total = collector.get_total_cost()
+        coverage_usd = min(matched / total, 1.0) if total > 0 else None
+        summary.update(
+            cost_coverage=round(enriched / len(resources), 4) if resources else None,
+            cost_coverage_usd=round(coverage_usd, 4) if coverage_usd is not None else None,
+            cost_account_monthly=total,
+            cost_matched_monthly=round(matched, 2),
+            cost_status=COST_OK if (coverage_usd or 0) >= COST_OK_MIN_COVERAGE_USD else COST_PARTIAL,
+        )
+        if summary["cost_status"] == COST_PARTIAL:
+            summary["cost_detail"] = "part of the spend belongs to services/resources SOFE does not inventory"
 
-    except Exception:
-        pass  # Graceful fallback — evaluation works without cost data
+        print(
+            f"  💰 Cost data: {enriched}/{len(resources)} resources matched "
+            f"(${matched:.2f} of ${total:.2f}/mo account spend, status={summary['cost_status']})",
+            file=sys.stderr,
+        )
+    except Exception as e:  # defensive: evaluation must work without cost data
+        from .aws.cost import classify_ce_error
+        summary["cost_status"], summary["cost_detail"] = classify_ce_error(e)
+    return summary
 
 
 def _enrich_commitments(session: boto3.Session, resources: list[Resource], account_id: str) -> dict[str, float | None]:
@@ -175,10 +227,17 @@ def _enrich_commitments(session: boto3.Session, resources: list[Resource], accou
         return {}
 
 
-def _build_account_resource(account_id: str, commit_metrics: dict[str, float | None], region: str) -> Resource:
+def _build_account_resource(
+    account_id: str,
+    commit_metrics: dict[str, float | None],
+    region: str,
+    cost_summary: dict | None = None,
+) -> Resource:
     """Synthetic account-level resource (S083) carrying savings metrics for policies.
 
     Policies scope to resource_types: [aws.account] to evaluate the account ONCE.
+    The cost summary (S111) travels in ``properties`` (not metrics: it holds strings), so a
+    caller reads it from the returned list instead of a module-level global shared by threads.
     """
     metrics: dict[str, float] = {}
     for k, v in commit_metrics.items():
@@ -193,7 +252,7 @@ def _build_account_resource(account_id: str, commit_metrics: dict[str, float | N
         region=region,
         account_id=account_id,
         tags={},
-        properties={},
+        properties=dict(cost_summary or {}),
         metrics=metrics,
     )
 
