@@ -30,6 +30,12 @@ S3_POLICIES = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _sequential(monkeypatch):
+    """Stubber answers calls in the order they were queued, so the tests that use it run one worker."""
+    monkeypatch.setattr(S3Collector, "MAX_WORKERS", 1)
+
+
 def real_client(region: str = REGION):
     return boto3.client("s3", region_name=region, aws_access_key_id="x", aws_secret_access_key="x")
 
@@ -291,3 +297,74 @@ class TestPolicies:
 
         bucket = [x for x in out if x.resource_type == "aws.s3"][0]
         assert not any(k.startswith("has_tag:") for k in bucket.metrics)
+
+
+# --------------------------------------------------------------------------- concurrency
+class TestParallelChecks:
+    @staticmethod
+    def _fake_client(names, failing=()):
+        c = MagicMock(name="s3")
+        c.meta.service_model.operation_model.return_value.input_shape.members = {"BucketRegion": 1}
+        c.can_paginate.return_value = False
+        c.list_buckets.return_value = {"Buckets": [{"Name": n, "CreationDate": CREATED, "BucketRegion": REGION} for n in names]}
+
+        def boom_or(value):
+            def f(Bucket):
+                if Bucket in failing:
+                    raise RuntimeError("unexpected")
+                return value
+            return f
+
+        c.get_bucket_encryption.side_effect = boom_or({})
+        c.get_bucket_lifecycle_configuration.side_effect = boom_or({"Rules": []})
+        c.get_bucket_versioning.side_effect = boom_or({})
+        c.get_public_access_block.side_effect = boom_or({"PublicAccessBlockConfiguration": {}})
+        c.get_bucket_logging.side_effect = boom_or({})
+        c.get_bucket_tagging.side_effect = boom_or({"TagSet": []})
+        return c
+
+    def test_many_buckets_are_collected_in_parallel_and_in_listing_order(self, monkeypatch):
+        monkeypatch.setattr(S3Collector, "MAX_WORKERS", 10)
+        names = [f"bucket-{i:02d}" for i in range(40)]
+        c = self._fake_client(names)
+
+        out = collector(c).collect()
+
+        assert [r.resource_id for r in out] == names
+        assert c.get_bucket_encryption.call_count == 40
+
+    def test_the_parallelism_is_bounded(self, monkeypatch):
+        import threading, time
+        monkeypatch.setattr(S3Collector, "MAX_WORKERS", 4)
+        c = self._fake_client([f"b{i}" for i in range(30)])
+        active, peak, lock = 0, 0, threading.Lock()
+        original = c.get_bucket_encryption.side_effect
+
+        def slow(Bucket):
+            nonlocal active, peak
+            with lock:
+                active += 1; peak = max(peak, active)
+            time.sleep(0.01)
+            with lock:
+                active -= 1
+            return original(Bucket)
+
+        c.get_bucket_encryption.side_effect = slow
+        collector(c).collect()
+
+        assert 1 < peak <= 4
+
+    def test_one_bucket_failing_unexpectedly_does_not_abort_the_others(self, monkeypatch, capsys):
+        monkeypatch.setattr(S3Collector, "MAX_WORKERS", 10)
+        c = self._fake_client(["ok-1", "bad", "ok-2"])
+        # an exception that is not a ClientError is "could not check", handled per check ...
+        out = collector(c).collect()
+        assert [r.resource_id for r in out] == ["ok-1", "bad", "ok-2"]
+
+        # ... and a failure OUTSIDE the checks (e.g. building the resource) drops only that bucket
+        original = S3Collector._collect_bucket
+        monkeypatch.setattr(S3Collector, "_collect_bucket", lambda self, s3, name, b: (_ for _ in ()).throw(RuntimeError("x")) if name == "bad" else original(self, s3, name, b))
+        out = collector(self._fake_client(["ok-1", "bad", "ok-2"])).collect()
+
+        assert [r.resource_id for r in out] == ["ok-1", "ok-2"]
+        assert "S3 bucket skipped" in capsys.readouterr().err

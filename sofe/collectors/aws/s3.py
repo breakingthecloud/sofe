@@ -11,6 +11,8 @@ returned a bucket, and every failed check was recorded as ``0.0``. Both are fixe
   reporting a violation nobody verified.
 """
 
+from concurrent.futures import ThreadPoolExecutor
+
 from botocore.exceptions import ClientError
 
 from .base import BaseCollector
@@ -35,6 +37,11 @@ def _code(exc: Exception) -> str:
 class S3Collector(BaseCollector):
     resource_type = "aws.s3"
 
+    # Six requests per bucket, one after another, would take minutes on an account with dozens of
+    # buckets, and the hosted API gateway cuts the evaluation at 30 s. boto3 clients are thread-safe;
+    # 10 matches urllib3's default connection pool, so no "pool is full" warnings.
+    MAX_WORKERS = 10
+
     def collect(self) -> list[Resource]:
         try:
             s3 = self.session.client('s3', region_name=self.region)
@@ -43,13 +50,21 @@ class S3Collector(BaseCollector):
             print(f"  ⚠️  S3 scan failed in {self.region}: {_code(e)}", file=sys.stderr)
             return []
 
-        resources = []
-        for b in buckets:
-            name = b.get('Name')
-            if not name:
-                continue
-            resources.append(self._collect_bucket(s3, name, b))
-        return resources
+        named = [b for b in buckets if b.get('Name')]
+        if self.MAX_WORKERS > 1 and len(named) > 1:
+            with ThreadPoolExecutor(max_workers=min(self.MAX_WORKERS, len(named))) as pool:
+                collected = list(pool.map(lambda b: self._collect_bucket_safely(s3, b), named))  # keeps listing order
+        else:
+            collected = [self._collect_bucket_safely(s3, b) for b in named]
+        return [r for r in collected if r is not None]
+
+    def _collect_bucket_safely(self, s3, listing: dict):
+        """One misbehaving bucket must not abort the evaluation of the others."""
+        try:
+            return self._collect_bucket(s3, listing['Name'], listing)
+        except Exception as e:
+            print(f"  ⚠️  S3 bucket skipped in {self.region}: {_code(e)}", file=sys.stderr)
+            return None
 
     # -- listing ---------------------------------------------------------------------
 
