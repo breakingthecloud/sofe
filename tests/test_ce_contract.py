@@ -191,6 +191,25 @@ class TestFailuresAreVisible:
         err = capsys.readouterr().err
         assert "ℹ️" in err and "⚠️" not in err.split("rightsizing")[0]
 
+    def test_an_opt_in_feature_that_is_not_enabled_is_information_and_names_no_arn(self, capsys):
+        msg = "Rightsizing EC2 recommendation is an opt-in only feature. Enable it for arn:aws:iam::999999999999:root"
+        c = collector_for(FlakyCE(fail={"rs": client_error("AccessDeniedException", msg)}))
+
+        c.collect()
+
+        err = capsys.readouterr().err
+        assert "ℹ️" in err and "feature not enabled" in err
+        assert "arn:" not in err and "999999999999" not in err
+        assert ("rightsizing:us-east-1", "AccessDeniedException") in c.get_errors()
+
+    def test_a_real_permission_denial_is_still_a_warning(self, capsys):
+        msg = "User: arn:aws:sts::999999999999:assumed-role/r/s is not authorized to perform: ce:GetRightsizingRecommendation"
+        collector_for(FlakyCE(fail={"rs": client_error("AccessDeniedException", msg)})).collect()
+
+        err = capsys.readouterr().err
+        assert "⚠️" in err and "ce:GetRightsizingRecommendation" in err and "feature not enabled" not in err
+        assert "arn:" not in err
+
     def test_errors_are_reset_on_every_collect(self):
         ce = FlakyCE(fail={"sp": client_error("ValidationException")})
         c = collector_for(ce)

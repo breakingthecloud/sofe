@@ -38,7 +38,9 @@ def classify_ce_error(exc: Exception) -> tuple[str, str]:
         code, msg = err.get("Code", ""), err.get("Message", "") or ""
     low = msg.lower()
 
-    if "not enabled for cost explorer" in low or code in ("DataUnavailableException", "OptInRequired"):
+    # "not enabled" covers Cost Explorer itself and its opt-in features (resource-level data, rightsizing),
+    # which AWS reports as AccessDeniedException with an explanatory message.
+    if "not enabled" in low or "opt-in" in low or code in ("DataUnavailableException", "OptInRequired"):
         return COST_NOT_ENABLED, code or "CostExplorerNotEnabled"
     if code.startswith("AccessDenied") or code in ("UnauthorizedOperation", "UnauthorizedAccess"):
         action = re.search(r"perform:\s*([a-z0-9-]+:[A-Za-z0-9*]+)", msg)

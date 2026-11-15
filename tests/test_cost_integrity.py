@@ -177,6 +177,8 @@ class TestStatus:
             (client_error("AccessDeniedException", "User not enabled for cost explorer access"), "not_enabled"),
             (client_error("DataUnavailableException", "Data is not available"), "not_enabled"),
             (client_error("OptInRequired", "x"), "not_enabled"),
+            (client_error("AccessDeniedException", "Rightsizing EC2 recommendation is an opt-in only feature. You can enable this feature from the PAYER account's Cost Explorer Preferences page."), "not_enabled"),
+            (client_error("AccessDeniedException", "Resource-level data is not enabled for this account"), "not_enabled"),
             (client_error("ThrottlingException", "Rate exceeded"), "error"),
             (client_error("LimitExceededException", "x"), "error"),
             (RuntimeError("socket closed"), "error"),

@@ -190,12 +190,17 @@ class RecommendationsCollector(BaseCollector):
     def _record_error(self, source: str, exc: Exception) -> None:
         """Make a failed request visible (it used to be swallowed, which hid a total outage for months).
 
-        Only the error code is kept/logged: AWS messages can embed role and account ARNs.
+        Only the error code (and, for IAM denials, the missing action) is kept and logged: AWS
+        messages can embed role and account ARNs. An opt-in feature that is simply not enabled
+        is an expected state, not a defect: it is logged at info level.
         """
+        from .cost import classify_ce_error, COST_NOT_ENABLED
+
         code = exc.response.get("Error", {}).get("Code", "ClientError") if isinstance(exc, ClientError) else type(exc).__name__
+        status, detail = classify_ce_error(exc)
         self._errors.append((source, code))
-        level = "ℹ️ " if code in _EXPECTED else "⚠️ "
-        print(f"  {level} recommendations({source}): {code}", file=sys.stderr)
+        expected = status == COST_NOT_ENABLED or code in _EXPECTED
+        print(f"  {'ℹ️ ' if expected else '⚠️ '} recommendations({source}): {detail}{' (feature not enabled)' if expected else ''}", file=sys.stderr)
 
     def get_errors(self) -> list[tuple[str, str]]:
         """(source, error code) for every request that failed in the last collect()."""
