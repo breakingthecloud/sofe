@@ -6,46 +6,27 @@ a number: a resource without a Cost Explorer match has no ``monthly_cost`` at al
 """
 
 from __future__ import annotations
-import re
 import sys
 from datetime import datetime, timedelta
-from botocore.exceptions import ClientError
 from ..aws.base import BaseCollector
+from ...billing.ce import (
+    EXCLUDED_RECORD_TYPES,
+    MAX_PAGES,
+    account_cost_filter,
+    classify_ce_error,
+)
+from ...billing.models import CostStatus
 from ...models import Resource
 
 # cost_status values (also exposed by sofe-server /evaluate)
-COST_OK = "ok"                      # data received and (almost) all spend matched to inventoried resources
-COST_PARTIAL = "partial"            # data received, but part of the spend is not matched to a resource
-COST_ACCESS_DENIED = "access_denied"  # the role cannot call Cost Explorer
-COST_NOT_ENABLED = "not_enabled"    # Cost Explorer / resource-level data is not enabled for the account
-COST_NO_DATA = "no_data"            # the call worked but there is no spend in the period
-COST_ERROR = "error"                # anything else (throttling, network, ...)
+COST_OK = CostStatus.ok.value
+COST_PARTIAL = CostStatus.partial.value
+COST_ACCESS_DENIED = CostStatus.access_denied.value
+COST_NOT_ENABLED = CostStatus.not_enabled.value
+COST_NO_DATA = CostStatus.no_data.value
+COST_ERROR = CostStatus.error.value
 
 COST_PERIOD_DAYS = 7                # Cost Explorer resource-level data: we read 7 days and extrapolate to 30
-MAX_PAGES = 50                      # safety net against a pagination loop
-EXCLUDED_RECORD_TYPES = ["Credit", "Refund", "Tax"]
-
-
-def classify_ce_error(exc: Exception) -> tuple[str, str]:
-    """Map a Cost Explorer failure to (cost_status, short detail).
-
-    The detail never contains the AWS error message: those embed role/account ARNs
-    (possibly of other accounts). Only the error code and, for IAM denials, the action.
-    """
-    code, msg = "", str(exc)
-    if isinstance(exc, ClientError):
-        err = exc.response.get("Error", {})
-        code, msg = err.get("Code", ""), err.get("Message", "") or ""
-    low = msg.lower()
-
-    # "not enabled" covers Cost Explorer itself and its opt-in features (resource-level data, rightsizing),
-    # which AWS reports as AccessDeniedException with an explanatory message.
-    if "not enabled" in low or "opt-in" in low or code in ("DataUnavailableException", "OptInRequired"):
-        return COST_NOT_ENABLED, code or "CostExplorerNotEnabled"
-    if code.startswith("AccessDenied") or code in ("UnauthorizedOperation", "UnauthorizedAccess"):
-        action = re.search(r"perform:\s*([a-z0-9-]+:[A-Za-z0-9*]+)", msg)
-        return COST_ACCESS_DENIED, f"{code}: {action.group(1)}" if action else code
-    return COST_ERROR, code or type(exc).__name__
 
 
 class CostCollector(BaseCollector):
@@ -118,7 +99,8 @@ class CostCollector(BaseCollector):
 
         except Exception as e:
             self._cost_map, self._reverse_index = {}, {}
-            self._status, self._detail = classify_ce_error(e)
+            status, detail = classify_ce_error(e)
+            self._status, self._detail = status.value, detail
             print(f"  ⚠️ Cost Explorer unavailable: {self._status} ({self._detail})", file=sys.stderr)
 
         return []  # This collector doesn't create resources
@@ -130,10 +112,7 @@ class CostCollector(BaseCollector):
         EVERY member account, so same-named resources of other accounts could be
         matched against this account's inventory.
         """
-        base = {"Not": {"Dimensions": {"Key": "RECORD_TYPE", "Values": EXCLUDED_RECORD_TYPES}}}
-        if not self.account_id:
-            return base
-        return {"And": [base, {"Dimensions": {"Key": "LINKED_ACCOUNT", "Values": [self.account_id]}}]}
+        return account_cost_filter(self.account_id)
 
     def get_status(self) -> str:
         """cost_status after collect(): ok | no_data | access_denied | not_enabled | error."""
