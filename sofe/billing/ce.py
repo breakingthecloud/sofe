@@ -54,11 +54,17 @@ def account_cost_filter(
     exclude_refunds: bool = True,
     exclude_taxes: bool = True,
     extra: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Build a Cost Explorer filter scoped to one account.
+) -> dict[str, Any] | None:
+    """Build a Cost Explorer filter scoped to one account (or an org-wide exclusion).
 
     Without ``LINKED_ACCOUNT`` a management account receives every member account's
-    spend; using the evaluated account id prevents cross-account attribution.
+    spend, which is exactly what an organization-wide view wants. Passing
+    ``account_id=None`` therefore keeps the record-type exclusions but drops the
+    account clause instead of dropping the whole filter (credits would otherwise
+    net a payer's usage to zero and turn a real spend into ``no_data``).
+
+    Returns ``None`` when there is nothing to filter by: Cost Explorer rejects an
+    empty filter object.
     """
     excluded: list[str] = []
     if exclude_credits:
@@ -77,7 +83,7 @@ def account_cost_filter(
         clauses.append(extra)
 
     if not clauses:
-        raise ValueError("a Cost Explorer filter needs at least one clause")
+        return None
     if len(clauses) == 1:
         return clauses[0]
     return {"And": clauses}

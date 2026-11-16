@@ -176,6 +176,18 @@ class TestErrorsAndFilters:
         excluded = [item for item in flt["And"] if "Not" in item][0]["Not"]["Dimensions"]
         assert excluded == {"Key": "RECORD_TYPE", "Values": ["Credit", "Refund", "Tax"]}
 
+    def test_org_wide_filter_keeps_record_type_exclusions(self):
+        flt = account_cost_filter(None)
+        assert flt == {"Not": {"Dimensions": {"Key": "RECORD_TYPE", "Values": ["Credit", "Refund", "Tax"]}}}
+
+    def test_no_filter_when_nothing_is_excluded_or_scoped(self):
+        assert (
+            account_cost_filter(
+                None, exclude_credits=False, exclude_refunds=False, exclude_taxes=False
+            )
+            is None
+        )
+
     def test_resource_query_uses_the_resource_operation_and_default_group(self):
         ce = FakeCE(pages=[page({"arn:aws:s3:::bucket": "7.0"})])
         result = query_resources(ce, query())

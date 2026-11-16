@@ -53,6 +53,13 @@ NO_PERMISSION = {("sts", "GetCallerIdentity")}
 # Lambda runs a boto3 whose ListBuckets filters by region server-side and never reaches that path.
 OPTIONAL = {("s3", "HeadBucket")}
 
+# The Billing API credit operations are signed manually (JSON 1.0 + SigV4), not called
+# through a boto3 client, so the AST scan cannot see them.
+STATIC_ACTIONS = {
+    "billing:GetCredits": "sofe/billing/credits.py: GetCredits",
+    "billing:GetCreditAllocationHistory": "sofe/billing/credits.py: GetCreditAllocationHistory",
+}
+
 
 def _models():
     cache: dict[str, object] = {}
@@ -107,6 +114,8 @@ def required_actions(collectors_dir: pathlib.Path = COLLECTORS_DIR) -> dict[str,
                 or f"{IAM_PREFIX.get(service, service)}:{operation}"
             )
             needs[action].add(f"{path.name}: {service}.{method}")
+    for action, source in STATIC_ACTIONS.items():
+        needs[action].add(source)
     return {a: sorted(src) for a, src in sorted(needs.items())}
 
 

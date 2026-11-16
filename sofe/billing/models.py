@@ -130,3 +130,64 @@ class OrganizationResult(BaseModel):
     management_account_id: str | None = None
     accounts: list[OrganizationAccount] = Field(default_factory=list)
     detail: str = ""
+
+
+class Credit(BaseModel):
+    """One AWS credit (Billing API ``GetCredits``), amounts in integer cents."""
+
+    credit_id: str
+    account_id: str
+    credit_type: str = ""
+    description: str = ""
+    initial_cents: int = 0
+    remaining_cents: int = 0
+    estimated_cents: int | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    exhaust_date: date | None = None
+    status: str = ""
+    products: list[str] = Field(default_factory=list)
+
+
+class CreditBalanceResult(BaseModel):
+    """Credit balances for an account (or an entire consolidated billing family)."""
+
+    credits: list[Credit] = Field(default_factory=list)
+    total_initial_cents: int = 0
+    total_remaining_cents: int = 0
+    total_estimated_cents: int = 0
+    by_account: dict[str, int] = Field(default_factory=dict)
+    status: CostStatus = CostStatus.no_data
+    detail: str = ""
+    requests: int = 0
+    period_start: date
+    period_end: date
+
+
+class CreditAllocation(BaseModel):
+    """One credit application line (account + service + billing month)."""
+
+    account_id: str
+    billing_month: str
+    service: str = ""
+    credit_id: str = ""
+    amount_cents: int = 0
+    description: str = ""
+    estimated: bool = False
+
+
+class CreditAllocationResult(BaseModel):
+    """Credit applications for a period, aggregated by month/account/service."""
+
+    entries: list[CreditAllocation] = Field(default_factory=list)
+    total_cents: int = 0
+    by_month: dict[str, int] = Field(default_factory=dict)
+    by_account: dict[str, int] = Field(default_factory=dict)
+    by_service: dict[str, int] = Field(default_factory=dict)
+    failed_months: list[str] = Field(default_factory=list)
+    partial: bool = False
+    status: CostStatus = CostStatus.no_data
+    detail: str = ""
+    requests: int = 0
+    period_start: date
+    period_end: date

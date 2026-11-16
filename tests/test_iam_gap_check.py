@@ -58,6 +58,10 @@ class TestRequiredActions:
     def test_new_s3_checks_are_found_automatically(self, needed):
         assert "s3:GetBucketLogging" in needed and "s3:GetBucketTagging" in needed and "s3:GetBucketVersioning" in needed
 
+    def test_manual_billing_api_actions_are_required(self, needed):
+        assert "billing:GetCredits" in needed
+        assert "billing:GetCreditAllocationHistory" in needed
+
 
 class TestGaps:
     def test_a_missing_action_is_reported(self, tmp_path):
