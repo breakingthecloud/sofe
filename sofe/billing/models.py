@@ -96,6 +96,8 @@ class CostGroup(BaseModel):
     keys: list[str] = Field(default_factory=list)
     amount_cents: int
     unit: str = "USD"
+    # Start of the CE period this group belongs to (YYYY-MM-DD); empty if ungrouped.
+    period: str = ""
 
 
 class CostResult(BaseModel):

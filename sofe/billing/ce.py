@@ -124,10 +124,18 @@ def query_costs(
             for result in response.get("ResultsByTime", []) or []:
                 page_groups = result.get("Groups") or []
                 if page_groups:
+                    period = str((result.get("TimePeriod") or {}).get("Start", "") or "")
                     for group in page_groups:
                         amount, unit = _metric_amount(group.get("Metrics", {}), query.metric.value)
                         cents = to_cents(amount)
-                        groups.append(CostGroup(keys=list(group.get("Keys", [])), amount_cents=cents, unit=unit))
+                        groups.append(
+                            CostGroup(
+                                keys=list(group.get("Keys", [])),
+                                amount_cents=cents,
+                                unit=unit,
+                                period=period,
+                            )
+                        )
                         total_cents += cents
                 else:
                     total = (result.get("Total") or {})
